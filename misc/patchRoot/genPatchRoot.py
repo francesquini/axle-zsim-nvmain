@@ -1,6 +1,6 @@
 #!/usr/bin/python
 
-# Copyright (C) 2013-2014 by Massachusetts Institute of Technology
+# Copyright (C) 2013-2015 by Massachusetts Institute of Technology
 #
 # This file is part of zsim.
 #
@@ -129,7 +129,7 @@ for cpu in range(ncpus):
     cmd("echo 0 > " + td + "physical_package_id")
     cmd("echo %s > %s" % (coreSiblingsMask, td + "core_siblings"))
     cmd("echo %s > %s" % (getMask(cpu, cpu), td + "thread_siblings"))
-    cmd("echo 1 > " + td + "online")
+    cmd("echo 1 > " + d + "online")
 
 # nodes
 nodeDir = root + "/sys/devices/system/node/"
