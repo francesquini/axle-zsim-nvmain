@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -25,7 +25,7 @@
 
 #include "debug_zsim.h"
 #include <fcntl.h>
-#include <libelf/gelf.h>
+#include <gelf.h>
 #include <link.h>
 #include <signal.h>
 #include <stdio.h>
@@ -47,19 +47,19 @@ static int pp_callback(dl_phdr_info* info, size_t size, void* data) {
         if ((fd = open (info->dlpi_name, O_RDONLY , 0)) < 0)
             panic("Opening %s failed", info->dlpi_name);
         elf_version(EV_CURRENT);
-        if ((e = elf_begin(fd, ELF_C_READ, NULL)) == NULL)
+        if ((e = elf_begin(fd, ELF_C_READ, nullptr)) == nullptr)
             panic("elf_begin() failed");
         size_t shstrndx; //we need this to get the section names
         if (elf_getshdrstrndx(e, &shstrndx) != 0)
             panic("elf_getshdrstrndx() failed");
 
         LibInfo* offsets = static_cast<LibInfo*>(data);
-        offsets->textAddr = NULL;
-        offsets->dataAddr = NULL;
-        offsets->bssAddr = NULL;
+        offsets->textAddr = nullptr;
+        offsets->dataAddr = nullptr;
+        offsets->bssAddr = nullptr;
 
-        scn = NULL;
-        while ((scn = elf_nextscn(e, scn)) != NULL) {
+        scn = nullptr;
+        while ((scn = elf_nextscn(e, scn)) != nullptr) {
             GElf_Shdr shdr;
             if (gelf_getshdr(scn, &shdr) != &shdr)
                 panic("gelf_getshdr() failed");
