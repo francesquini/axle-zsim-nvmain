@@ -668,6 +668,7 @@ void VdsoInsertFunc(IMG vi, const char* fName, VdsoFunc func) {
 }
 
 void VdsoInit() {
+    return;
     Section vdso = FindSection("vdso");
     vdsoStart = vdso.start;
     vdsoEnd = vdso.end;
