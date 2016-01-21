@@ -1,7 +1,6 @@
-/** $glic$
+/** $lic$
  * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
- * Copyright (C) 2011 Google Inc.
  *
  * This file is part of zsim.
  *
@@ -24,31 +23,22 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VIRT_VIRT_H_
-#define VIRT_VIRT_H_
+#ifndef __TRACING_CACHE_H__
+#define __TRACING_CACHE_H__
 
-// External virt interface
+#include "access_tracing.h"
+#include "cache.h"
 
-#include "pin.H"
+class TracingCache : public Cache {
+    private:
+        g_string tracefile;
+        AccessTraceWriter* atw;
+        lock_t traceLock;
 
-enum PostPatchAction {
-    PPA_NOTHING,
-    PPA_USE_RETRY_PTRS,
-    PPA_USE_JOIN_PTRS,
+    public:
+        TracingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _tracefile, g_string& _name);
+        void setChildren(const g_vector<BaseCache*>& children, Network* network);
+        uint64_t access(MemReq& req);
 };
 
-void VirtInit();  // per-process, not global
-void VirtSyscallEnter(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, const char* patchRoot, bool isNopThread);
-PostPatchAction VirtSyscallExit(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std);
-
-// VDSO / external virt functions
-void VirtGettimeofday(uint32_t tid, ADDRINT arg0);
-void VirtTime(uint32_t tid, REG* retVal, ADDRINT arg0);
-void VirtClockGettime(uint32_t tid, ADDRINT arg0, ADDRINT arg1);
-void VirtGetcpu(uint32_t tid, uint32_t cpu, ADDRINT arg0, ADDRINT arg1);
-
-// Time virtualization direct functions
-void VirtCaptureClocks(bool isDeffwd);  // called on start and ffwd to get all clocks together
-uint64_t VirtGetPhaseRDTSC();
-
-#endif  // VIRT_VIRT_H_
+#endif

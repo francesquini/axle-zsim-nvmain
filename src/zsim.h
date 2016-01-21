@@ -48,6 +48,9 @@ class EventRecorder;
 class PinCmd;
 class PortVirtualizer;
 class VectorCounter;
+class AccessTraceWriter;
+class TraceDriver;
+template <typename T> class g_vector;
 
 struct ClockDomainInfo {
     uint64_t realtimeOffsetNs;
@@ -134,10 +137,9 @@ struct GlobSimInfo {
     const char* outputDir; //all the output files mst be dumped here. Stored because complex workloads often change dir, then spawn...
 
     AggregateStat* rootStat;
+    g_vector<StatsBackend*>* statsBackends; // used for termination dumps
     StatsBackend* periodicStatsBackend;
-    StatsBackend* statsBackend; //end-of-sim backend
     StatsBackend* eventualStatsBackend;
-    StatsBackend* compactStatsBackend;
     ProcessStats* processStats;
     ProcStats* procStats;
 
@@ -175,6 +177,13 @@ struct GlobSimInfo {
     lock_t pauseLocks[256]; //per-process pauses
     volatile bool globalPauseFlag; //if set, pauses simulation on phase end
     volatile bool externalTermPending;
+
+    // Trace writers (stored globally because they need to be deleted when the simulation ends)
+    g_vector<AccessTraceWriter*>* traceWriters;
+
+    // Trace-driven simulation (no cores)
+    bool traceDriven;
+    TraceDriver* traceDriver;
 
     // NVMain
     bool hasNVMain;

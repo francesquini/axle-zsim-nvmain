@@ -56,7 +56,7 @@
 #define ISSUES_PER_CYCLE 4
 #define RF_READS_PER_CYCLE 3
 
-OOOCore::OOOCore(FilterCache* _l1i, FilterCache* _l1d, g_string& _name, uint32_t _id) : Core(_name), l1i(_l1i), l1d(_l1d), id(_id), cRec(0, _name) {
+OOOCore::OOOCore(FilterCache* _l1i, FilterCache* _l1d, g_string& _name, uint32_t _id) : Core(_name), l1i(_l1i), l1d(_l1d), cRec(0, _name) {
     decodeCycle = DECODE_STAGE;  // allow subtracting from it
     curCycle = 0;
     phaseEndCycle = zinfo->phaseLength;
@@ -196,7 +196,7 @@ inline void OOOCore::bbl(Address bblAddr, BblInfo* bblInfo) {
     // Run dispatch/IW
     for (uint32_t i = 0; i < bbl->uops; i++) {
         DynUop* uop = &(bbl->uop[i]);
-        
+
         // Decode stalls
         uint32_t decDiff = uop->decCycle - prevDecCycle;
         decodeCycle = MAX(decodeCycle + decDiff, uopQueue.minAllocCycle());
@@ -320,7 +320,7 @@ inline void OOOCore::bbl(Address bblAddr, BblInfo* bblInfo) {
 
                     // Wait for all previous store addresses to be resolved (not just ours :))
                     dispatchCycle = MAX(lastStoreAddrCommitCycle+1, dispatchCycle);
-                    
+
                     Address addr = storeAddrs[storeIdx++];
                     uint64_t reqSatisfiedCycle = l1d->store(addr, dispatchCycle) + L1D_LAT;
                     cRec.record(curCycle, dispatchCycle, reqSatisfiedCycle);
@@ -415,7 +415,7 @@ inline void OOOCore::bbl(Address bblAddr, BblInfo* bblInfo) {
          * (28 uops), IW (36 uops), and 16B instr length predecoder buffer. At
          * ~3.5 bytes/instr, 1.2 uops/instr, this is about 5 64-byte lines.
          */
-         
+
         // info("Mispredicted branch, %ld %ld %ld | %ld %ld", decodeCycle, curCycle, lastCommitCycle,
         //         lastCommitCycle-decodeCycle, lastCommitCycle-curCycle);
         Address wrongPathAddr = branchTaken? branchNotTakenNpc : branchTakenNpc;

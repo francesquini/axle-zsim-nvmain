@@ -40,6 +40,7 @@
 #include <sys/resource.h>
 #include <sys/time.h>
 #include <unistd.h>
+#include "access_tracing.h"
 #include "constants.h"
 #include "contention_sim.h"
 #include "core.h"
@@ -56,7 +57,7 @@
 #include "profile_stats.h"
 #include "scheduler.h"
 #include "stats.h"
-//#include "syscall_funcs.h"
+#include "trace_driver.h"
 #include "virt/virt.h"
 #include "nvmain_mem_ctrl.h"
 
@@ -365,6 +366,7 @@ VOID FFIEntryBasicBlock(THREADID tid, ADDRINT bblAddr, BblInfo* bblInfo) {
 // Non-analysis pointer vars
 static const InstrFuncPtrs joinPtrs = {JoinAndLoadSingle, JoinAndStoreSingle, JoinAndBasicBlock, JoinAndRecordBranch, JoinAndPredLoadSingle, JoinAndPredStoreSingle, FPTR_JOIN};
 static const InstrFuncPtrs nopPtrs = {NOPLoadStoreSingle, NOPLoadStoreSingle, NOPBasicBlock, NOPRecordBranch, NOPPredLoadStoreSingle, NOPPredLoadStoreSingle, FPTR_NOP};
+static const InstrFuncPtrs retryPtrs = {NOPLoadStoreSingle, NOPLoadStoreSingle, NOPBasicBlock, NOPRecordBranch, NOPPredLoadStoreSingle, NOPPredLoadStoreSingle, FPTR_RETRY};
 static const InstrFuncPtrs ffPtrs = {NOPLoadStoreSingle, NOPLoadStoreSingle, FFBasicBlock, NOPRecordBranch, NOPPredLoadStoreSingle, NOPPredLoadStoreSingle, FPTR_NOP};
 
 static const InstrFuncPtrs ffiPtrs = {NOPLoadStoreSingle, NOPLoadStoreSingle, FFIBasicBlock, NOPRecordBranch, NOPPredLoadStoreSingle, NOPPredLoadStoreSingle, FPTR_NOP};
@@ -502,12 +504,16 @@ uint32_t TakeBarrier(uint32_t tid, uint32_t cid) {
         info("Thread %d entering fast-forward", tid);
         clearCid(tid);
         zinfo->sched->leave(procIdx, tid, newCid);
+        newCid = INVALID_CID;
         SimThreadFini(tid);
         fPtrs[tid] = GetFFPtrs();
     } else if (zinfo->terminationConditionMet) {
         info("Termination condition met, exiting");
         zinfo->sched->leave(procIdx, tid, newCid);
         SimEnd(); //need to call this on a per-process basis...
+    } else {
+        // Set fPtrs to those of the new core after possible context switch
+        fPtrs[tid] = cores[tid]->GetFuncPtrs();
     }
 
     return newCid;
@@ -893,11 +899,15 @@ VOID ThreadFini(THREADID tid, const CONTEXT *ctxt, INT32 flags, VOID *v) {
 //Need to remove ourselves from running threads in case the syscall is blocking
 VOID SyscallEnter(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, VOID *v) {
     bool isNopThread = fPtrs[tid].type == FPTR_NOP;
-    VirtSyscallEnter(tid, ctxt, std, procTreeNode->getPatchRoot(), isNopThread);
+    bool isRetryThread = fPtrs[tid].type == FPTR_RETRY;
+
+    if (!isRetryThread) {
+        VirtSyscallEnter(tid, ctxt, std, procTreeNode->getPatchRoot(), isNopThread);
+    }
 
     assert(!inSyscall[tid]); inSyscall[tid] = true;
 
-    if (isNopThread) return;
+    if (isNopThread || isRetryThread) return;
 
     /* NOTE: It is possible that we take 2 syscalls back to back with any
      * intervening instrumentation, so we need to check. In that case, this is
@@ -908,11 +918,11 @@ VOID SyscallEnter(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, VOID *v) {
         uint32_t cid = getCid(tid);
         // set an invalid cid, ours is property of the scheduler now!
         clearCid(tid);
-        
+
         zinfo->sched->syscallLeave(procIdx, tid, cid, PIN_GetContextReg(ctxt, REG_INST_PTR),
                 PIN_GetSyscallNumber(ctxt, std), PIN_GetSyscallArgument(ctxt, std, 0),
                 PIN_GetSyscallArgument(ctxt, std, 1));
-        //zinfo->sched->leave(procIdx, tid, cid); 
+        //zinfo->sched->leave(procIdx, tid, cid);
         fPtrs[tid] = joinPtrs;  // will join at the next instr point
         //info("SyscallEnter %d", tid);
     }
@@ -928,8 +938,8 @@ VOID SyscallExit(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, VOID *v) {
         } else {
             fPtrs[tid] = cores[tid]->GetFuncPtrs(); //go back to normal pointers, directly
         }
-    } else if (ppa == PPA_USE_NOP_PTRS) {
-        fPtrs[tid] = nopPtrs;
+    } else if (ppa == PPA_USE_RETRY_PTRS) {
+        fPtrs[tid] = retryPtrs;
     } else {
         assert(ppa == PPA_NOTHING);
     }
@@ -1114,10 +1124,8 @@ VOID SimEnd() {
 
         info("Dumping termination stats");
         zinfo->trigger = 20000;
-        if (zinfo->periodicStatsBackend) zinfo->periodicStatsBackend->dump(false); //write last phase to periodic backend
-        zinfo->statsBackend->dump(false);
-        zinfo->eventualStatsBackend->dump(false);
-        zinfo->compactStatsBackend->dump(false);
+        for (StatsBackend* backend : *(zinfo->statsBackends)) backend->dump(false /*unbuffered, write out*/);
+        for (AccessTraceWriter* t : *(zinfo->traceWriters)) t->dump(false);  // flushes trace writer
 
         // Print NVMain internal stats
         info("Has nvmain %d, num memory controllers %d", zinfo->hasNVMain, zinfo->numMemoryControllers);
@@ -1127,7 +1135,7 @@ VOID SimEnd() {
             }
         }
 
-        zinfo->sched->notifyTermination();
+        if (zinfo->sched) zinfo->sched->notifyTermination();
     }
 
     //Uncomment when debugging termination races, which can be rare because they are triggered by threads of a dying process
@@ -1174,7 +1182,7 @@ VOID HandleMagicOp(THREADID tid, ADDRINT op) {
                     //we stay in the barrier forever. And deadlock. And the deadlock code does nothing, since we're in FF
                     //So, force immediate entry if we're sync-ffwding
                     if (procTreeNode->getSyncedFastForward()) {
-                        info("Thread %d entering fast-forward", tid);
+                        info("Thread %d entering fast-forward (immediate)", tid);
                         uint32_t cid = getCid(tid);
                         assert(cid != INVALID_CID);
                         clearCid(tid);
@@ -1533,7 +1541,7 @@ int main(int argc, char *argv[]) {
 
     info("procMask: 0x%lx", procMask);
 
-    zinfo->sched->processCleanup(procIdx);
+    if (zinfo->sched) zinfo->sched->processCleanup(procIdx);
 
     VirtCaptureClocks(false);
     FFIInit();
@@ -1563,8 +1571,21 @@ int main(int argc, char *argv[]) {
     //OK, screw it. Launch this on a separate thread, and forget about signals... the caller will set a shared memory var. PIN is hopeless with signal instrumentation on multithreaded processes!
     PIN_SpawnInternalThread(FFThread, nullptr, 64*1024, nullptr);
 
-    //Never returns
-    PIN_StartProgram();
+    // Start trace-driven or exec-driven sim
+    if (zinfo->traceDriven) {
+        info("Running trace-driven simulation");
+        while (!zinfo->terminationConditionMet && zinfo->traceDriver->executePhase()) {
+            // info("Phase done");
+            EndOfPhaseActions();
+            zinfo->numPhases++;
+            zinfo->globPhaseCycles += zinfo->phaseLength;
+        }
+        info("Finished trace-driven simulation");
+        SimEnd();
+    } else {
+        // Never returns
+        PIN_StartProgram();
+    }
     return 0;
 }
 

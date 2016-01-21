@@ -57,6 +57,7 @@
 #include "part_repl_policies.h"
 #include "pin_cmd.h"
 #include "prefetcher.h"
+#include "proc_stats.h"
 #include "process_stats.h"
 #include "process_tree.h"
 #include "profile_stats.h"
@@ -65,9 +66,12 @@
 #include "simple_core.h"
 #include "stats.h"
 #include "stats_filter.h"
+#include "str.h"
 #include "timing_cache.h"
 #include "timing_core.h"
 #include "timing_event.h"
+#include "trace_driver.h"
+#include "tracing_cache.h"
 #include "virt/port_virtualizer.h"
 #include "weave_md1_mem.h" //validation, could be taken out...
 #include "zsim.h"
@@ -80,6 +84,14 @@ extern void EndOfPhaseActions(); //in zsim.cpp
  */
 
 BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, uint32_t bankSize, bool isTerminal, uint32_t domain) {
+    string type = config.get<const char*>(prefix + "type", "Simple");
+    // Shortcut for TraceDriven type
+    if (type == "TraceDriven") {
+        assert(zinfo->traceDriven);
+        assert(isTerminal);
+        return new TraceDriverProxyCache(name);
+    }
+
     uint32_t lineSize = zinfo->lineSize;
     assert(lineSize > 0); //avoid config deps
     if (bankSize % lineSize != 0) panic("%s: Bank size must be a multiple of line size", name.c_str());
@@ -244,12 +256,11 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
     uint32_t accLat = (isTerminal)? 0 : latency; //terminal caches has no access latency b/c it is assumed accLat is hidden by the pipeline
     uint32_t invLat = latency;
 
-    //Type and inclusion
-    string type = config.get<const char*>(prefix + "type", "Simple");
+    // Inclusion?
     bool nonInclusiveHack = config.get<bool>(prefix + "nonInclusiveHack", false);
     if (nonInclusiveHack) assert(type == "Simple" && !isTerminal);
 
-    //Finally, build the cache
+    // Finally, build the cache
     Cache* cache;
     CC* cc;
     if (isTerminal) {
@@ -266,6 +277,10 @@ BaseCache* BuildCacheBank(Config& config, const string& prefix, g_string& name, 
             uint32_t tagLat = config.get<uint32_t>(prefix + "tagLat", 5);
             uint32_t timingCandidates = config.get<uint32_t>(prefix + "timingCandidates", candidates);
             cache = new TimingCache(numLines, cc, array, rp, accLat, invLat, mshrs, tagLat, ways, timingCandidates, domain, name);
+        } else if (type == "Tracing") {
+            g_string traceFile = config.get<const char*>(prefix + "traceFile","");
+            if (traceFile.empty()) traceFile = g_string(zinfo->outputDir) + "/" + name + ".trace";
+            cache = new TracingCache(numLines, cc, array, rp, accLat, invLat, traceFile, name);
         } else {
             panic("Invalid cache type %s", type.c_str());
         }
@@ -290,6 +305,31 @@ string replace(string s, const string& a, const string& b) {
     s.replace(index, a.length(), b);
   }
   return s;
+}
+
+// NOTE: frequency is SYSTEM frequency; mem freq specified in tech
+DDRMemory* BuildDDRMemory(Config& config, uint32_t lineSize, uint32_t frequency, uint32_t domain, g_string name, const string& prefix) {
+    uint32_t ranksPerChannel = config.get<uint32_t>(prefix + "ranksPerChannel", 4);
+    uint32_t banksPerRank = config.get<uint32_t>(prefix + "banksPerRank", 8);  // DDR3 std is 8
+    uint32_t pageSize = config.get<uint32_t>(prefix + "pageSize", 8*1024);  // 1Kb cols, x4 devices
+    const char* tech = config.get<const char*>(prefix + "tech", "DDR3-1333-CL10");  // see cpp file for other techs
+    const char* addrMapping = config.get<const char*>(prefix + "addrMapping", "rank:col:bank");  // address splitter interleaves channels; row always on top
+
+    // If set, writes are deferred and bursted out to reduce WTR overheads
+    bool deferWrites = config.get<bool>(prefix + "deferWrites", true);
+    bool closedPage = config.get<bool>(prefix + "closedPage", true);
+
+    // Max row hits before we stop prioritizing further row hits to this bank.
+    // Balances throughput and fairness; 0 -> FCFS / high (e.g., -1) -> pure FR-FCFS
+    uint32_t maxRowHits = config.get<uint32_t>(prefix + "maxRowHits", 4);
+
+    // Request queues
+    uint32_t queueDepth = config.get<uint32_t>(prefix + "queueDepth", 16);
+    uint32_t controllerLatency = config.get<uint32_t>(prefix + "controllerLatency", 10);  // in system cycles
+
+    auto mem = new DDRMemory(zinfo->lineSize, pageSize, ranksPerChannel, banksPerRank, frequency, tech,
+            addrMapping, controllerLatency, queueDepth, maxRowHits, deferWrites, closedPage, domain, name);
+    return mem;
 }
 
 MemObject* BuildMemoryController(Config& config, uint32_t lineSize, uint32_t frequency, uint32_t domain, g_string& name) {
@@ -319,26 +359,7 @@ MemObject* BuildMemoryController(Config& config, uint32_t lineSize, uint32_t fre
         uint32_t boundLatency = config.get<uint32_t>("sys.mem.boundLatency", 100);
         mem = new WeaveSimpleMemory(latency, boundLatency, domain, name);
     } else if (type == "DDR") {
-        uint32_t ranksPerChannel = config.get<uint32_t>("sys.mem.ranksPerChannel", 4);
-        uint32_t banksPerRank = config.get<uint32_t>("sys.mem.banksPerRank", 8);  // DDR3 std is 8
-        uint32_t pageSize = config.get<uint32_t>("sys.mem.pageSize", 8*1024);  // 1Kb cols, x4 devices
-        const char* tech = config.get<const char*>("sys.mem.tech", "DDR3-1333-CL10");  // see cpp file for other techs
-        const char* addrMapping = config.get<const char*>("sys.mem.addrMapping", "rank:col:bank");  // address splitter interleaves channels; row always on top
-
-        // If set, writes are deferred and bursted out to reduce WTR overheads
-        bool deferWrites = config.get<bool>("sys.mem.deferWrites", true);
-        bool closedPage = config.get<bool>("sys.mem.closedPage", true);
-
-        // Max row hits before we stop prioritizing further row hits to this bank.
-        // Balances throughput and fairness; 0 -> FCFS / high (e.g., -1) -> pure FR-FCFS
-        uint32_t maxRowHits = config.get<uint32_t>("sys.mem.maxRowHits", 4);
-
-        // Request queues
-        uint32_t queueDepth = config.get<uint32_t>("sys.mem.queueDepth", 16);
-        uint32_t controllerLatency = config.get<uint32_t>("sys.mem.controllerLatency", 10);  // in system cycles
-
-        mem = new DDRMemory(zinfo->lineSize, pageSize, ranksPerChannel, banksPerRank, frequency, tech,
-                addrMapping, controllerLatency, queueDepth, maxRowHits, deferWrites, closedPage, domain, name);
+        mem = BuildDDRMemory(config, lineSize, frequency, domain, name, "sys.mem.");
     } else if (type == "DRAMSim") {
         uint64_t cpuFreqHz = 1000000 * frequency;
         uint32_t capacity = config.get<uint32_t>("sys.mem.capacityMB", 16384);
@@ -417,13 +438,23 @@ CacheGroup* BuildCacheGroup(Config& config, const string& name, bool isTerminal)
 
 static void InitSystem(Config& config) {
     unordered_map<string, string> parentMap; //child -> parent
-    unordered_map<string, vector<string>> childMap; //parent -> children (a parent may have multiple children, they are ordered by appearance in the file)
+    unordered_map<string, vector<vector<string>>> childMap; //parent -> children (a parent may have multiple children)
 
-    //If a network file is specificied, build a Network
+    auto parseChildren = [](string children) {
+        // 1st dim: concatenated caches; 2nd dim: interleaved caches
+        // Example: "l2-beefy l1i-wimpy|l1d-wimpy" produces [["l2-beefy"], ["l1i-wimpy", "l1d-wimpy"]]
+        // If there are 2 of each cache, the final vector will be l2-beefy-0 l2-beefy-1 l1i-wimpy-0 l1d-wimpy-0 l1i-wimpy-1 l1d-wimpy-1
+        vector<string> concatGroups = ParseList<string>(children);
+        vector<vector<string>> cVec;
+        for (string cg : concatGroups) cVec.push_back(ParseList<string>(cg, "|"));
+        return cVec;
+    };
+
+    // If a network file is specified, build a Network
     string networkFile = config.get<const char*>("sys.networkFile", "");
     Network* network = (networkFile != "")? new Network(networkFile.c_str()) : nullptr;
 
-    //Build the caches
+    // Build the caches
     vector<const char*> cacheGroupNames;
     config.subgroups("sys.caches", cacheGroupNames);
     string prefix = "sys.caches.";
@@ -431,37 +462,45 @@ static void InitSystem(Config& config) {
     for (const char* grp : cacheGroupNames) {
         string group(grp);
         if (group == "mem") panic("'mem' is an invalid cache group name");
-        if (parentMap.count(group)) panic("Duplicate cache group %s", (prefix + group).c_str());
-        string parent = config.get<const char*>(prefix + group + ".parent");
-        parentMap[group] = parent;
-        if (!childMap.count(parent)) childMap[parent] = vector<string>();
-        childMap[parent].push_back(group);
+        if (childMap.count(group)) panic("Duplicate cache group %s", (prefix + group).c_str());
+
+        string children = config.get<const char*>(prefix + group + ".children", "");
+        childMap[group] = parseChildren(children);
+        for (auto v : childMap[group]) for (auto child : v) {
+            if (parentMap.count(child)) {
+                panic("Cache group %s can have only one parent (%s and %s found)", child.c_str(), parentMap[child].c_str(), grp);
+            }
+            parentMap[child] = group;
+        }
     }
 
-    //Check that all parents are valid: Either another cache, or "mem"
-    for (const char* grp : cacheGroupNames) {
-        string group(grp);
-        string parent = parentMap[group];
-        if (parent != "mem" && !parentMap.count(parent)) panic("%s has invalid parent %s", (prefix + group).c_str(), parent.c_str());
+    // Check that children are valid (another cache)
+    for (auto& it : parentMap) {
+        bool found = false;
+        for (auto& grp : cacheGroupNames) found |= it.first == grp;
+        if (!found) panic("%s has invalid child %s", it.second.c_str(), it.first.c_str());
     }
 
-    //Get the (single) LLC
-    if (!childMap.count("mem")) panic("One cache must have mem as parent, none found");
-    if (childMap["mem"].size() != 1) panic("One cache must have mem as parent, multiple found");
-    string llc = childMap["mem"][0];
+    // Get the (single) LLC
+    vector<string> parentlessCacheGroups;
+    for (auto& it : childMap) if (!parentMap.count(it.first)) parentlessCacheGroups.push_back(it.first);
+    if (parentlessCacheGroups.size() != 1) panic("Only one last-level cache allowed, found: %s", Str(parentlessCacheGroups).c_str());
+    string llc = parentlessCacheGroups[0];
 
-    //Build each of the groups, starting with the LLC
+    auto isTerminal = [&](string group) -> bool {
+        return childMap[group].size() == 0;
+    };
+
+    // Build each of the groups, starting with the LLC
     unordered_map<string, CacheGroup*> cMap;
-    list<string> fringe; //FIFO
+    list<string> fringe;  // FIFO
     fringe.push_back(llc);
     while (!fringe.empty()) {
         string group = fringe.front();
         fringe.pop_front();
-
-        bool isTerminal = (childMap.count(group) == 0); //if no children, connected to cores
         if (cMap.count(group)) panic("The cache 'tree' has a loop at %s", group.c_str());
-        cMap[group] = BuildCacheGroup(config, group, isTerminal);
-        if (!isTerminal) for (string child : childMap[group]) fringe.push_back(child);
+        cMap[group] = BuildCacheGroup(config, group, isTerminal(group));
+        for (auto& childVec : childMap[group]) fringe.insert(fringe.end(), childVec.begin(), childVec.end());
     }
 
     //Check single LLC
@@ -502,6 +541,7 @@ static void InitSystem(Config& config) {
     }
 
     //Connect everything
+    bool printHierarchy = config.get<bool>("sim.printHierarchy", false);
 
     // mem to llc is a bit special, only one llc
     uint32_t childId = 0;
@@ -511,15 +551,33 @@ static void InitSystem(Config& config) {
 
     // Rest of caches
     for (const char* grp : cacheGroupNames) {
-        if (childMap.count(grp) == 0) continue; //skip terminal caches
+        if (isTerminal(grp)) continue; //skip terminal caches
 
         CacheGroup& parentCaches = *cMap[grp];
         uint32_t parents = parentCaches.size();
         assert(parents);
 
-        //Concatenation of all child caches
+        // Linearize concatenated / interleaved caches from childMap cacheGroups
         CacheGroup childCaches;
-        for (string child : childMap[grp]) childCaches.insert(childCaches.end(), cMap[child]->begin(), cMap[child]->end());
+
+        for (auto childVec : childMap[grp]) {
+            if (!childVec.size()) continue;
+            size_t vecSize = cMap[childVec[0]]->size();
+            for (string child : childVec) {
+                if (cMap[child]->size() != vecSize) {
+                    panic("In interleaved group %s, %s has a different number of caches", Str(childVec).c_str(), child.c_str());
+                }
+            }
+
+            CacheGroup interleavedGroup;
+            for (uint32_t i = 0; i < vecSize; i++) {
+                for (uint32_t j = 0; j < childVec.size(); j++) {
+                    interleavedGroup.push_back(cMap[childVec[j]]->at(i));
+                }
+            }
+
+            childCaches.insert(childCaches.end(), interleavedGroup.begin(), interleavedGroup.end());
+        }
 
         uint32_t children = childCaches.size();
         assert(children);
@@ -527,18 +585,7 @@ static void InitSystem(Config& config) {
         uint32_t childrenPerParent = children/parents;
         if (children % parents != 0) {
             panic("%s has %d caches and %d children, they are non-divisible. "
-                    "Use multiple groups for non-homogeneous children per parent!", grp, parents, children);
-        }
-
-        //HACK FIXME: This solves the L1I+D-L2 connection bug, but it's not very clear.
-        //A long-term solution is to specify whether the children should be interleaved or concatenated.
-        bool terminalChildren = true;
-        for (string child : childMap[grp]) terminalChildren &= (childMap.count(child) == 0 || config.get<bool>("sys.caches." + child + ".isPrefetcher", false));
-        if (terminalChildren) {
-            info("%s's children are all terminal OR PREFETCHERS, interleaving them", grp);
-            CacheGroup tmp(childCaches);
-            uint32_t stride = children/childrenPerParent;
-            for (uint32_t i = 0; i < children; i++) childCaches[i] = tmp[(i % childrenPerParent)*stride + i/childrenPerParent];
+                  "Use multiple groups for non-homogeneous children per parent!", grp, parents, children);
         }
 
         for (uint32_t p = 0; p < parents; p++) {
@@ -554,6 +601,19 @@ static void InitSystem(Config& config) {
                 }
             }
 
+            if (printHierarchy) {
+                vector<string> cacheNames;
+                std::transform(childrenVec.begin(), childrenVec.end(), std::back_inserter(cacheNames),
+                        [](BaseCache* c) -> string { string s = c->getName(); return s; });
+
+                string parentName = parentCaches[p][0]->getName();
+                if (parentCaches[p].size() > 1) {
+                    parentName += "..";
+                    parentName += parentCaches[p][parentCaches[p].size()-1]->getName();
+                }
+                info("Hierarchy: %s -> %s", Str(cacheNames).c_str(), parentName.c_str());
+            }
+
             for (BaseCache* bank : parentCaches[p]) {
                 bank->setChildren(childrenVec, network);
             }
@@ -562,7 +622,7 @@ static void InitSystem(Config& config) {
 
     //Check that all the terminal caches have a single bank
     for (const char* grp : cacheGroupNames) {
-        if (childMap.count(grp) == 0) {
+        if (isTerminal(grp)) {
             uint32_t banks = (*cMap[grp])[0].size();
             if (banks != 1) panic("Terminal cache group %s needs to have a single bank, has %d", grp, banks);
         }
@@ -570,131 +630,154 @@ static void InitSystem(Config& config) {
 
     //Tracks how many terminal caches have been allocated to cores
     unordered_map<string, uint32_t> assignedCaches;
-    for (const char* grp : cacheGroupNames) if (childMap.count(grp) == 0) assignedCaches[grp] = 0;
+    for (const char* grp : cacheGroupNames) if (isTerminal(grp)) assignedCaches[grp] = 0;
 
-    //Instantiate the cores
-    vector<const char*> coreGroupNames;
-    unordered_map <string, vector<Core*>> coreMap;
+    if (!zinfo->traceDriven) {
+        //Instantiate the cores
+        vector<const char*> coreGroupNames;
+        unordered_map <string, vector<Core*>> coreMap;
+        config.subgroups("sys.cores", coreGroupNames);
 
-    config.subgroups("sys.cores", coreGroupNames);
+        uint32_t coreIdx = 0;
+        for (const char* group : coreGroupNames) {
+            if (parentMap.count(group)) panic("Core group name %s is invalid, a cache group already has that name", group);
 
-    uint32_t coreIdx = 0;
-    for (const char* group : coreGroupNames) {
-        if (parentMap.count(group)) panic("Core group name %s is invalid, a cache group already has that name", group);
+            coreMap[group] = vector<Core*>();
 
-        coreMap[group] = vector<Core*>();
+            string prefix = string("sys.cores.") + group + ".";
+            uint32_t cores = config.get<uint32_t>(prefix + "cores", 1);
+            string type = config.get<const char*>(prefix + "type", "Simple");
 
-        string prefix = string("sys.cores.") + group + ".";
-        uint32_t cores = config.get<uint32_t>(prefix + "cores", 1);
-        string type = config.get<const char*>(prefix + "type", "Simple");
-
-        //Build the core group
-        union {
-            SimpleCore* simpleCores;
-            TimingCore* timingCores;
-            OOOCore* oooCores;
-            NullCore* nullCores;
-        };
-        if (type == "Simple") {
-            simpleCores = gm_memalign<SimpleCore>(CACHE_LINE_BYTES, cores);
-        } else if (type == "Timing") {
-            timingCores = gm_memalign<TimingCore>(CACHE_LINE_BYTES, cores);
-        } else if (type == "OOO") {
-            oooCores = gm_memalign<OOOCore>(CACHE_LINE_BYTES, cores);
-            zinfo->oooDecode = true; //enable uop decoding, this is false by default, must be true if even one OOO cpu is in the system
-        } else if (type == "nullptr") {
-            nullCores = gm_memalign<NullCore>(CACHE_LINE_BYTES, cores);
-        } else {
-            panic("%s: Invalid core type %s", group, type.c_str());
-        }
-
-        if (type != "nullptr") {
-            string icache = config.get<const char*>(prefix + "icache");
-            string dcache = config.get<const char*>(prefix + "dcache");
-
-            if (!assignedCaches.count(icache)) panic("%s: Invalid icache parameter %s", group, icache.c_str());
-            if (!assignedCaches.count(dcache)) panic("%s: Invalid dcache parameter %s", group, dcache.c_str());
-
-            for (uint32_t j = 0; j < cores; j++) {
-                stringstream ss;
-                ss << group << "-" << j;
-                g_string name(ss.str().c_str());
-                Core* core;
-
-                //Get the caches
-                CacheGroup& igroup = *cMap[icache];
-                CacheGroup& dgroup = *cMap[dcache];
-
-                if (assignedCaches[icache] >= igroup.size()) {
-                    panic("%s: icache group %s (%ld caches) is fully used, can't connect more cores to it", name.c_str(), icache.c_str(), igroup.size());
-                }
-                FilterCache* ic = dynamic_cast<FilterCache*>(igroup[assignedCaches[icache]][0]);
-                assert(ic);
-                ic->setSourceId(coreIdx);
-                ic->setFlags(MemReq::IFETCH | MemReq::NOEXCL);
-                assignedCaches[icache]++;
-
-                if (assignedCaches[dcache] >= dgroup.size()) {
-                    panic("%s: dcache group %s (%ld caches) is fully used, can't connect more cores to it", name.c_str(), dcache.c_str(), dgroup.size());
-                }
-                FilterCache* dc = dynamic_cast<FilterCache*>(dgroup[assignedCaches[dcache]][0]);
-                assert(dc);
-                dc->setSourceId(coreIdx);
-                assignedCaches[dcache]++;
-
-                //Build the core
-                if (type == "Simple") {
-                    core = new (&simpleCores[j]) SimpleCore(ic, dc, name);
-                } else if (type == "Timing") {
-                    uint32_t domain = j*zinfo->numDomains/cores;
-                    TimingCore* tcore = new (&timingCores[j]) TimingCore(ic, dc, domain, name);
-                    zinfo->eventRecorders[coreIdx] = tcore->getEventRecorder();
-                    zinfo->eventRecorders[coreIdx]->setSourceId(coreIdx);
-                    core = tcore;
-                } else {
-                    assert(type == "OOO");
-                    OOOCore* ocore = new (&oooCores[j]) OOOCore(ic, dc, name, j);
-                    zinfo->eventRecorders[coreIdx] = ocore->getEventRecorder();
-                    zinfo->eventRecorders[coreIdx]->setSourceId(coreIdx);
-                    core = ocore;
-                }
-                coreMap[group].push_back(core);
-                coreIdx++;
+            //Build the core group
+            union {
+                SimpleCore* simpleCores;
+                TimingCore* timingCores;
+                OOOCore* oooCores;
+                NullCore* nullCores;
+            };
+            if (type == "Simple") {
+                simpleCores = gm_memalign<SimpleCore>(CACHE_LINE_BYTES, cores);
+            } else if (type == "Timing") {
+                timingCores = gm_memalign<TimingCore>(CACHE_LINE_BYTES, cores);
+            } else if (type == "OOO") {
+                oooCores = gm_memalign<OOOCore>(CACHE_LINE_BYTES, cores);
+                zinfo->oooDecode = true; //enable uop decoding, this is false by default, must be true if even one OOO cpu is in the system
+            } else if (type == "Null") {
+                nullCores = gm_memalign<NullCore>(CACHE_LINE_BYTES, cores);
+            } else {
+                panic("%s: Invalid core type %s", group, type.c_str());
             }
-        } else {
-            assert(type == "nullptr");
-            for (uint32_t j = 0; j < cores; j++) {
-                stringstream ss;
-                ss << group << "-" << j;
-                g_string name(ss.str().c_str());
-                Core* core = new (&nullCores[j]) NullCore(name);
-                coreMap[group].push_back(core);
-                coreIdx++;
+
+            if (type != "Null") {
+                string icache = config.get<const char*>(prefix + "icache");
+                string dcache = config.get<const char*>(prefix + "dcache");
+
+                if (!assignedCaches.count(icache)) panic("%s: Invalid icache parameter %s", group, icache.c_str());
+                if (!assignedCaches.count(dcache)) panic("%s: Invalid dcache parameter %s", group, dcache.c_str());
+
+                for (uint32_t j = 0; j < cores; j++) {
+                    stringstream ss;
+                    ss << group << "-" << j;
+                    g_string name(ss.str().c_str());
+                    Core* core;
+
+                    //Get the caches
+                    CacheGroup& igroup = *cMap[icache];
+                    CacheGroup& dgroup = *cMap[dcache];
+
+                    if (assignedCaches[icache] >= igroup.size()) {
+                        panic("%s: icache group %s (%ld caches) is fully used, can't connect more cores to it", name.c_str(), icache.c_str(), igroup.size());
+                    }
+                    FilterCache* ic = dynamic_cast<FilterCache*>(igroup[assignedCaches[icache]][0]);
+                    assert(ic);
+                    ic->setSourceId(coreIdx);
+                    ic->setFlags(MemReq::IFETCH | MemReq::NOEXCL);
+                    assignedCaches[icache]++;
+
+                    if (assignedCaches[dcache] >= dgroup.size()) {
+                        panic("%s: dcache group %s (%ld caches) is fully used, can't connect more cores to it", name.c_str(), dcache.c_str(), dgroup.size());
+                    }
+                    FilterCache* dc = dynamic_cast<FilterCache*>(dgroup[assignedCaches[dcache]][0]);
+                    assert(dc);
+                    dc->setSourceId(coreIdx);
+                    assignedCaches[dcache]++;
+
+                    //Build the core
+                    if (type == "Simple") {
+                        core = new (&simpleCores[j]) SimpleCore(ic, dc, name);
+                    } else if (type == "Timing") {
+                        uint32_t domain = j*zinfo->numDomains/cores;
+                        TimingCore* tcore = new (&timingCores[j]) TimingCore(ic, dc, domain, name);
+                        zinfo->eventRecorders[coreIdx] = tcore->getEventRecorder();
+                        zinfo->eventRecorders[coreIdx]->setSourceId(coreIdx);
+                        core = tcore;
+                    } else {
+                        assert(type == "OOO");
+                        OOOCore* ocore = new (&oooCores[j]) OOOCore(ic, dc, name, j);
+                        zinfo->eventRecorders[coreIdx] = ocore->getEventRecorder();
+                        zinfo->eventRecorders[coreIdx]->setSourceId(coreIdx);
+                        core = ocore;
+                    }
+                    coreMap[group].push_back(core);
+                    coreIdx++;
+                }
+            } else {
+                assert(type == "Null");
+                for (uint32_t j = 0; j < cores; j++) {
+                    stringstream ss;
+                    ss << group << "-" << j;
+                    g_string name(ss.str().c_str());
+                    Core* core = new (&nullCores[j]) NullCore(name);
+                    coreMap[group].push_back(core);
+                    coreIdx++;
+                }
             }
         }
-    }
 
-    //Check that all the terminal caches are fully connected
-    for (const char* grp : cacheGroupNames) {
-        if (childMap.count(grp) == 0 && assignedCaches[grp] != cMap[grp]->size()) {
-            panic("%s: Terminal cache group not fully connected, %ld caches, %d assigned", grp, cMap[grp]->size(), assignedCaches[grp]);
+        //Check that all the terminal caches are fully connected
+        for (const char* grp : cacheGroupNames) {
+            if (isTerminal(grp) && assignedCaches[grp] != cMap[grp]->size()) {
+                panic("%s: Terminal cache group not fully connected, %ld caches, %d assigned", grp, cMap[grp]->size(), assignedCaches[grp]);
+            }
         }
+
+        //Populate global core info
+        assert(zinfo->numCores == coreIdx);
+        zinfo->cores = gm_memalign<Core*>(CACHE_LINE_BYTES, zinfo->numCores);
+        coreIdx = 0;
+        for (const char* group : coreGroupNames) for (Core* core : coreMap[group]) zinfo->cores[coreIdx++] = core;
+
+        //Init stats: cores
+        for (const char* group : coreGroupNames) {
+            AggregateStat* groupStat = new AggregateStat(true);
+            groupStat->init(gm_strdup(group), "Core stats");
+            for (Core* core : coreMap[group]) core->initStats(groupStat);
+            zinfo->rootStat->append(groupStat);
+        }
+    } else {  // trace-driven: create trace driver and proxy caches
+        vector<TraceDriverProxyCache*> proxies;
+        for (const char* grp : cacheGroupNames) {
+            if (isTerminal(grp)) {
+                for (vector<BaseCache*> cv : *cMap[grp]) {
+                    assert(cv.size() == 1);
+                    TraceDriverProxyCache* proxy = dynamic_cast<TraceDriverProxyCache*>(cv[0]);
+                    assert(proxy);
+                    proxies.push_back(proxy);
+                }
+            }
+        }
+
+        //FIXME: For now, we assume we are driving a single-bank LLC
+        string traceFile = config.get<const char*>("sim.traceFile");
+        string retraceFile = config.get<const char*>("sim.retraceFile", ""); //leave empty to not retrace
+        zinfo->traceDriver = new TraceDriver(traceFile, retraceFile, proxies,
+                config.get<bool>("sim.useSkews", true), // incorporate skews in to playback and simulator results, not only the output trace
+                config.get<bool>("sim.playPuts", true),
+                config.get<bool>("sim.playAllGets", true));
+        zinfo->traceDriver->initStats(zinfo->rootStat);
     }
 
-    //Populate global core info
-    assert(zinfo->numCores == coreIdx);
-    zinfo->cores = gm_memalign<Core*>(CACHE_LINE_BYTES, zinfo->numCores);
-    coreIdx = 0;
-    for (const char* group : coreGroupNames) for (Core* core : coreMap[group]) zinfo->cores[coreIdx++] = core;
-
-    //Init stats: cores, caches, mem
-    for (const char* group : coreGroupNames) {
-        AggregateStat* groupStat = new AggregateStat(true);
-        groupStat->init(gm_strdup(group), "Core stats");
-        for (Core* core : coreMap[group]) core->initStats(groupStat);
-        zinfo->rootStat->append(groupStat);
-    }
-
+    //Init stats: caches, mem
     for (const char* group : cacheGroupNames) {
         AggregateStat* groupStat = new AggregateStat(true);
         groupStat->init(gm_strdup(group), "Cache stats");
@@ -752,13 +835,14 @@ static void PostInitStats(bool perProcessDir, Config& config) {
         };
 
         zinfo->eventQueue->insert(new PeriodicStatsDumpEvent(zinfo->statsPhaseInterval));
-
+        zinfo->statsBackends->push_back(zinfo->periodicStatsBackend);
     } else {
         zinfo->periodicStatsBackend = nullptr;
     }
 
     zinfo->eventualStatsBackend = new HDF5Backend(evStatsFile, zinfo->rootStat, (1 << 17) /* 128KB chunks */, zinfo->skipStatsVectors, false /* don't sum regular aggregates*/);
     zinfo->eventualStatsBackend->dump(true); //must have a first sample
+    zinfo->statsBackends->push_back(zinfo->eventualStatsBackend);
 
     if (zinfo->maxMinInstrs) {
         warn("maxMinInstrs IS DEPRECATED");
@@ -773,9 +857,11 @@ static void PostInitStats(bool perProcessDir, Config& config) {
         }
     }
 
-    zinfo->compactStatsBackend = new HDF5Backend(cmpStatsFile, zinfo->rootStat, 0 /* no aggregation, this is just 1 record */, zinfo->skipStatsVectors, true); //don't dump a first sample.
-
-    zinfo->statsBackend = new TextBackend(statsFile, zinfo->rootStat);
+    // Convenience stats
+    StatsBackend* compactStats = new HDF5Backend(cmpStatsFile, zinfo->rootStat, 0 /* no aggregation, this is just 1 record */, zinfo->skipStatsVectors, true); //don't dump a first sample.
+    StatsBackend* textStats = new TextBackend(statsFile, zinfo->rootStat);
+    zinfo->statsBackends->push_back(compactStats);
+    zinfo->statsBackends->push_back(textStats);
 }
 
 static void InitGlobalStats() {
@@ -797,6 +883,7 @@ static void InitGlobalStats() {
 void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     zinfo = gm_calloc<GlobSimInfo>();
     zinfo->outputDir = gm_strdup(outputDir);
+    zinfo->statsBackends = new g_vector<StatsBackend*>();
 
     Config config(configFile);
 
@@ -813,25 +900,33 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
 
     PreInitStats();
 
-    //Get the number of cores
-    //TODO: There is some duplication with the core creation code. This should be fixed eventually.
-    uint32_t numCores = 0;
-    vector<const char*> groups;
-    config.subgroups("sys.cores", groups);
-    for (const char* group : groups) {
-        uint32_t cores = config.get<uint32_t>(string("sys.cores.") + group + ".cores", 1);
-        numCores += cores;
-    }
+    zinfo->traceDriven = config.get<bool>("sim.traceDriven", false);
 
-    if (numCores == 0) panic("Config must define some core classes in sys.cores; sys.numCores is deprecated");
-    zinfo->numCores = numCores;
-    assert(numCores <= MAX_THREADS); //TODO: Is there any reason for this limit?
+    if (zinfo->traceDriven) {
+        zinfo->numCores = 0;
+    } else {
+        // Get the number of cores
+        // TODO: There is some duplication with the core creation code. This should be fixed eventually.
+        uint32_t numCores = 0;
+        vector<const char*> groups;
+        config.subgroups("sys.cores", groups);
+        for (const char* group : groups) {
+            uint32_t cores = config.get<uint32_t>(string("sys.cores.") + group + ".cores", 1);
+            numCores += cores;
+        }
+
+        if (numCores == 0) panic("Config must define some core classes in sys.cores; sys.numCores is deprecated");
+        zinfo->numCores = numCores;
+        assert(numCores <= MAX_THREADS); //TODO: Is there any reason for this limit?
+    }
 
     zinfo->numDomains = config.get<uint32_t>("sim.domains", 1);
     uint32_t numSimThreads = config.get<uint32_t>("sim.contentionThreads", MAX((uint32_t)1, zinfo->numDomains/2)); //gives a bit of parallelism, TODO tune
     zinfo->contentionSim = new ContentionSim(zinfo->numDomains, numSimThreads);
     zinfo->contentionSim->initStats(zinfo->rootStat);
-    zinfo->eventRecorders = gm_calloc<EventRecorder*>(numCores);
+    zinfo->eventRecorders = gm_calloc<EventRecorder*>(zinfo->numCores);
+
+    zinfo->traceWriters = new g_vector<AccessTraceWriter*>();
 
     // Global simulation values
     zinfo->numPhases = 0;
@@ -864,13 +959,17 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
 
     zinfo->eventQueue = new EventQueue(); //must be instantiated before the memory hierarchy
 
-    //Build the scheduler
-    uint32_t parallelism = config.get<uint32_t>("sim.parallelism", 2*sysconf(_SC_NPROCESSORS_ONLN));
-    if (parallelism < zinfo->numCores) info("Limiting concurrent threads to %d", parallelism);
-    assert(parallelism > 0); //jeez...
+    if (!zinfo->traceDriven) {
+        //Build the scheduler
+        uint32_t parallelism = config.get<uint32_t>("sim.parallelism", 2*sysconf(_SC_NPROCESSORS_ONLN));
+        if (parallelism < zinfo->numCores) info("Limiting concurrent threads to %d", parallelism);
+        assert(parallelism > 0); //jeez...
 
-    uint32_t schedQuantum = config.get<uint32_t>("sim.schedQuantum", 10000); //phases
-    zinfo->sched = new Scheduler(EndOfPhaseActions, parallelism, zinfo->numCores, schedQuantum);
+        uint32_t schedQuantum = config.get<uint32_t>("sim.schedQuantum", 10000); //phases
+        zinfo->sched = new Scheduler(EndOfPhaseActions, parallelism, zinfo->numCores, schedQuantum);
+    } else {
+        zinfo->sched = nullptr;
+    }
 
     zinfo->blockingSyscalls = config.get<bool>("sim.blockingSyscalls", false);
 
@@ -906,9 +1005,16 @@ void SimInit(const char* configFile, const char* outputDir, uint32_t shmid) {
     InitSystem(config);
 
     //Sched stats (deferred because of circular deps)
-    zinfo->sched->initStats(zinfo->rootStat);
+    if (zinfo->sched) zinfo->sched->initStats(zinfo->rootStat);
 
     zinfo->processStats = new ProcessStats(zinfo->rootStat);
+
+    const char* procStatsFilter = config.get<const char*>("sim.procStatsFilter", "");
+    if (strlen(procStatsFilter)) {
+        zinfo->procStats = new ProcStats(zinfo->rootStat, FilterStats(zinfo->rootStat, procStatsFilter));
+    } else {
+        zinfo->procStats = nullptr;
+    }
 
     //It's a global stat, but I want it to be last...
     zinfo->profHeartbeats = new VectorCounter();

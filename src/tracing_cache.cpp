@@ -1,7 +1,6 @@
-/** $glic$
+/** $lic$
  * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
- * Copyright (C) 2011 Google Inc.
  *
  * This file is part of zsim.
  *
@@ -24,31 +23,29 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef VIRT_VIRT_H_
-#define VIRT_VIRT_H_
+#include "tracing_cache.h"
+#include "zsim.h"
 
-// External virt interface
+TracingCache::TracingCache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, g_string& _tracefile, g_string& _name) :
+    Cache(_numLines, _cc, _array, _rp, _accLat, _invLat, _name), tracefile(_tracefile)
+{
+    futex_init(&traceLock);
+}
 
-#include "pin.H"
+void TracingCache::setChildren(const g_vector<BaseCache*>& children, Network* network) {
+    Cache::setChildren(children, network);
+    //We need to initialize the trace writer here because it needs the number of children
+    atw = new AccessTraceWriter(tracefile, children.size());
+    zinfo->traceWriters->push_back(atw); //register it so that it gets flushed when the simulation ends
+}
 
-enum PostPatchAction {
-    PPA_NOTHING,
-    PPA_USE_RETRY_PTRS,
-    PPA_USE_JOIN_PTRS,
-};
+uint64_t TracingCache::access(MemReq& req) {
+    uint64_t respCycle = Cache::access(req);
+    futex_lock(&traceLock);
+    uint32_t lat = respCycle - req.cycle;
+    AccessRecord acc = {req.lineAddr, req.cycle, lat, req.childId, req.type};
+    atw->write(acc);
+    futex_unlock(&traceLock);
+    return respCycle;
+}
 
-void VirtInit();  // per-process, not global
-void VirtSyscallEnter(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std, const char* patchRoot, bool isNopThread);
-PostPatchAction VirtSyscallExit(THREADID tid, CONTEXT *ctxt, SYSCALL_STANDARD std);
-
-// VDSO / external virt functions
-void VirtGettimeofday(uint32_t tid, ADDRINT arg0);
-void VirtTime(uint32_t tid, REG* retVal, ADDRINT arg0);
-void VirtClockGettime(uint32_t tid, ADDRINT arg0, ADDRINT arg1);
-void VirtGetcpu(uint32_t tid, uint32_t cpu, ADDRINT arg0, ADDRINT arg1);
-
-// Time virtualization direct functions
-void VirtCaptureClocks(bool isDeffwd);  // called on start and ffwd to get all clocks together
-uint64_t VirtGetPhaseRDTSC();
-
-#endif  // VIRT_VIRT_H_

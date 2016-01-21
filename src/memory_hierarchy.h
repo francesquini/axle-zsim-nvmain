@@ -70,6 +70,10 @@ const char* AccessTypeName(AccessType t);
 const char* InvTypeName(InvType t);
 const char* MESIStateName(MESIState s);
 
+inline bool IsGet(AccessType t) { return t == GETS || t == GETX; }
+inline bool IsPut(AccessType t) { return t == PUTS || t == PUTX; }
+
+
 /* Memory request */
 struct MemReq {
     Address lineAddr;
@@ -100,6 +104,16 @@ struct MemReq {
     inline bool is (Flag f) const {return flags & f;}
 };
 
+/* Invalidation/downgrade request */
+struct InvReq {
+    Address lineAddr;
+    InvType type;
+    // NOTE: writeback should start false, children pull it up to true
+    bool* writeback;
+    uint64_t cycle;
+    uint32_t srcId;
+};
+
 /** INTERFACES **/
 
 class AggregateStat;
@@ -119,7 +133,7 @@ class BaseCache : public MemObject {
     public:
         virtual void setParents(uint32_t _childId, const g_vector<MemObject*>& parents, Network* network) = 0;
         virtual void setChildren(const g_vector<BaseCache*>& children, Network* network) = 0;
-        virtual uint64_t invalidate(Address lineAddr, InvType type, bool* reqWriteback, uint64_t reqCycle, uint32_t srcId) = 0;
+        virtual uint64_t invalidate(const InvReq& req) = 0;
 };
 
 #endif  // MEMORY_HIERARCHY_H_

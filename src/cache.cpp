@@ -26,6 +26,10 @@
 #include "cache.h"
 #include "hash.h"
 
+#include "event_recorder.h"
+#include "timing_event.h"
+#include "zsim.h"
+
 Cache::Cache(uint32_t _numLines, CC* _cc, CacheArray* _array, ReplPolicy* _rp, uint32_t _accLat, uint32_t _invLat, const g_string& _name)
     : cc(_cc), array(_array), rp(_rp), numLines(_numLines), accLat(_accLat), invLat(_invLat), name(_name) {}
 
@@ -74,8 +78,44 @@ uint64_t Cache::access(MemReq& req) {
 
             array->postinsert(req.lineAddr, &req, lineId); //do the actual insertion. NOTE: Now we must split insert into a 2-phase thing because cc unlocks us.
         }
+        // Enforce single-record invariant: Writeback access may have a timing
+        // record. If so, read it.
+        EventRecorder* evRec = zinfo->eventRecorders[req.srcId];
+        TimingRecord wbAcc;
+        wbAcc.clear();
+        if (unlikely(evRec && evRec->hasRecord())) {
+            wbAcc = evRec->popRecord();
+        }
 
         respCycle = cc->processAccess(req, lineId, respCycle);
+
+        // Access may have generated another timing record. If *both* access
+        // and wb have records, stitch them together
+        if (unlikely(wbAcc.isValid())) {
+            if (!evRec->hasRecord()) {
+                // Downstream should not care about endEvent for PUTs
+                wbAcc.endEvent = nullptr;
+                evRec->pushRecord(wbAcc);
+            } else {
+                // Connect both events
+                TimingRecord acc = evRec->popRecord();
+                assert(wbAcc.reqCycle >= req.cycle);
+                assert(acc.reqCycle >= req.cycle);
+                DelayEvent* startEv = new (evRec) DelayEvent(0);
+                DelayEvent* dWbEv = new (evRec) DelayEvent(wbAcc.reqCycle - req.cycle);
+                DelayEvent* dAccEv = new (evRec) DelayEvent(acc.reqCycle - req.cycle);
+                startEv->setMinStartCycle(req.cycle);
+                dWbEv->setMinStartCycle(req.cycle);
+                dAccEv->setMinStartCycle(req.cycle);
+                startEv->addChild(dWbEv, evRec)->addChild(wbAcc.startEvent, evRec);
+                startEv->addChild(dAccEv, evRec)->addChild(acc.startEvent, evRec);
+
+                acc.reqCycle = req.cycle;
+                acc.startEvent = startEv;
+                // endEvent / endCycle stay the same; wbAcc's endEvent not connected
+                evRec->pushRecord(acc);
+            }
+        }
     }
 
     cc->endAccess(req);
@@ -85,16 +125,17 @@ uint64_t Cache::access(MemReq& req) {
     return respCycle;
 }
 
-uint64_t Cache::invalidate(Address lineAddr, InvType type, bool* reqWriteback, uint64_t reqCycle, uint32_t srcId) {
+void Cache::startInvalidate() {
     cc->startInv(); //note we don't grab tcc; tcc serializes multiple up accesses, down accesses don't see it
+}
 
-    int32_t lineId = array->lookup(lineAddr, nullptr, false);
-    assert_msg(lineId != -1, "[%s] Invalidate on non-existing address 0x%lx type %s lineId %d, reqWriteback %d", name.c_str(), lineAddr, InvTypeName(type), lineId, *reqWriteback);
-    uint64_t respCycle = reqCycle + invLat;
-    trace(Cache, "[%s] Invalidate start 0x%lx type %s lineId %d, reqWriteback %d", name.c_str(), lineAddr, InvTypeName(type), lineId, *reqWriteback);
-    respCycle = cc->processInv(lineAddr, lineId, type, reqWriteback, respCycle, srcId); //send invalidates or downgrades to children, and adjust our own state
-    trace(Cache, "[%s] Invalidate end 0x%lx type %s lineId %d, reqWriteback %d, latency %ld", name.c_str(), lineAddr, InvTypeName(type), lineId, *reqWriteback, respCycle - reqCycle);
+uint64_t Cache::finishInvalidate(const InvReq& req) {
+    int32_t lineId = array->lookup(req.lineAddr, nullptr, false);
+    assert_msg(lineId != -1, "[%s] Invalidate on non-existing address 0x%lx type %s lineId %d, reqWriteback %d", name.c_str(), req.lineAddr, InvTypeName(req.type), lineId, *req.writeback);
+    uint64_t respCycle = req.cycle + invLat;
+    trace(Cache, "[%s] Invalidate start 0x%lx type %s lineId %d, reqWriteback %d", name.c_str(), req.lineAddr, InvTypeName(req.type), lineId, *req.writeback);
+    respCycle = cc->processInv(req, lineId, respCycle); //send invalidates or downgrades to children, and adjust our own state
+    trace(Cache, "[%s] Invalidate end 0x%lx type %s lineId %d, reqWriteback %d, latency %ld", name.c_str(), req.lineAddr, InvTypeName(req.type), lineId, *req.writeback, respCycle - req.cycle);
 
     return respCycle;
 }
-
