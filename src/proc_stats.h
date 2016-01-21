@@ -23,20 +23,37 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-// Put this before any includes
-#define QUOTED_(x) #x
-#define QUOTED(x) QUOTED_(x)
+#ifndef PROC_STATS_H_
+#define PROC_STATS_H_
 
-#define __SYSCALL(a, b) QUOTED(b),
+#include "galloc.h"
+#include "stats.h"
 
-static const char* syscallNames[] = {
-#include <asm/unistd.h>
-"INVALID"
+class ProcStats : public GlobAlloc {
+    private:
+
+        class ProcessCounter;
+        class ProcessVectorCounter;
+
+        uint64_t lastUpdatePhase;
+
+        AggregateStat* coreStats;  // each member must be a regular aggregate with numCores elems
+        AggregateStat* procStats;  // stats produced
+
+        uint64_t* buf;
+        uint64_t* lastBuf;
+        uint64_t bufSize;
+
+    public:
+        explicit ProcStats(AggregateStat* parentStat, AggregateStat* _coreStats); //includes initStats, called post-system init
+
+        // Must be called by scheduler when descheduling; core must be quiesced
+        void notifyDeschedule();
+
+    private:
+        Stat* replStat(Stat* s, const char* name = nullptr, const char* desc = nullptr);
+
+        void update();  // transparent
 };
 
-#include <stdint.h>
-
-const char* GetSyscallName(uint32_t syscall) {
-    return (syscall >= sizeof(syscallNames)/sizeof(syscallNames[0]))? "INVALID" : syscallNames[syscall];
-}
-
+#endif  // PROCESS_STATS_H_

@@ -39,6 +39,7 @@
 #include "g_std/g_unordered_set.h"
 #include "g_std/g_vector.h"
 #include "intrusive_list.h"
+#include "proc_stats.h"
 #include "process_stats.h"
 #include "stats.h"
 #include "zsim.h"
@@ -181,12 +182,12 @@ class Scheduler : public GlobAlloc, public Callee {
             //nextVictim = 0; //only used when freeList is empty.
             curPhase = 0;
             scheduledThreads = 0;
-           
+
             maxAllowedFutexWakeups = 0;
             unmatchedFutexWakeups = 0;
 
             blockingSyscalls.resize(MAX_THREADS /* TODO: max # procs */);
-            
+
             info("Started RR scheduler, quantum=%d phases", schedQuantum);
             terminateWatchdogThread = false;
             startWatchdogThread();
@@ -215,7 +216,7 @@ class Scheduler : public GlobAlloc, public Callee {
             futex_lock(&schedLock);
             uint32_t gid = getGid(pid, tid);
             //info("[G %d] Start", gid);
-            assert(gidMap.find(gid) == gidMap.end());
+            assert((gidMap.find(gid) == gidMap.end()));
             // Get pid and tid straight from the OS
             // - SYS_gettid because glibc does not implement gettid()
             // - SYS_getpid because after a fork (where zsim calls ThreadStart),
@@ -230,7 +231,7 @@ class Scheduler : public GlobAlloc, public Callee {
             futex_lock(&schedLock);
             uint32_t gid = getGid(pid, tid);
             //info("[G %d] Finish", gid);
-            assert(gidMap.find(gid) != gidMap.end());
+            assert((gidMap.find(gid) != gidMap.end()));
             ThreadInfo* th = gidMap[gid];
             gidMap.erase(gid);
 
@@ -441,11 +442,11 @@ class Scheduler : public GlobAlloc, public Callee {
                 while (th && th->wakeupPhase <= curPhase) {
                     assert(th->wakeupPhase == curPhase);
                     trace(Sched, "%d SLEEPING -> BLOCKED, waking up from timeout syscall (curPhase %ld, wakeupPhase %ld)", th->gid, curPhase, th->wakeupPhase);
-                    
+
                     // Try to deschedule ourselves
                     th->state = BLOCKED;
                     wakeup(th, false /*no join, this is sleeping out of the scheduler*/);
-                    
+
                     sleepQueue.pop_front();
                     th = sleepQueue.front();
                 }
@@ -571,6 +572,7 @@ class Scheduler : public GlobAlloc, public Callee {
             assert(ctx->cid == th->cid);
             assert(ctx->curThread == th);
             assert(targetState == BLOCKED || targetState == QUEUED || targetState == SLEEPING);
+            if (zinfo->procStats) zinfo->procStats->notifyDeschedule();  // FIXME: Interface
             th->state = targetState;
             ctx->state = IDLE;
             ctx->curThread = nullptr;
@@ -682,7 +684,7 @@ class Scheduler : public GlobAlloc, public Callee {
 
         ThreadInfo* schedContext(ContextInfo* ctx) {
             ThreadInfo* th = nullptr;
-            ThreadInfo* blockedTh = runQueue.front(); //nullptr if empty
+            ThreadInfo* blockedTh = runQueue.front();  // null if empty
             while (blockedTh) {
                 if (blockedTh->mask[ctx->cid]) {
                     th = blockedTh;
@@ -769,7 +771,7 @@ class Scheduler : public GlobAlloc, public Callee {
      * To this end, the following interface supports an adaptive join-leave implementation that avoids most desyncs:
      * - Threads should call syscallLeave() and syscallJoin(), passing their PC and a small syscall descriptor for a few syscalls of interest.
      * - The scheduler adaptively decides whether we should wait for a syscall to join or to start the next phase. It avoids deadlock by having
-     *   the watchdog detect potential deadlocks, and desyncing the threads. To avoid frequent desyncs, it blacklists syscalls 
+     *   the watchdog detect potential deadlocks, and desyncing the threads. To avoid frequent desyncs, it blacklists syscalls
      * - When the scheduler wakes up a sleeping thread (e.g., in a timeout syscall), it ensures the phase does not slip by.
      * - When the scheduler sees a FUTEX_WAKE, it ensures we wait for the woken-up thread(s).
      *
@@ -811,7 +813,7 @@ class Scheduler : public GlobAlloc, public Callee {
         // Externally, has the exact same behavior as leave(); internally, may choose to not actually leave;
         // join() and finish() handle this state
         void syscallLeave(uint32_t pid, uint32_t tid, uint32_t cid, uint64_t pc, int syscallNumber, uint64_t arg0, uint64_t arg1);
-   
+
         // Futex wake/wait matching interface
         void notifyFutexWakeStart(uint32_t pid, uint32_t tid, uint32_t maxWakes);
         void notifyFutexWakeEnd(uint32_t pid, uint32_t tid, uint32_t wokenUp);
@@ -821,11 +823,11 @@ class Scheduler : public GlobAlloc, public Callee {
         volatile uint32_t maxAllowedFutexWakeups;
         volatile uint32_t unmatchedFutexWakeups;
 
-        // Called with schedLock held, at the start of a join 
-        void futexWakeJoin(ThreadInfo* th);  // may release and re-acquire schedLock 
+        // Called with schedLock held, at the start of a join
+        void futexWakeJoin(ThreadInfo* th);  // may release and re-acquire schedLock
         void futexWaitJoin(ThreadInfo* th);
 
-        
+
         void finishFakeLeave(ThreadInfo* th);
 
         /* Must be called with schedLock held. Waits until the given thread is
