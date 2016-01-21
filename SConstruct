@@ -33,11 +33,11 @@ def buildSim(cppFlags, dir, type, pgo=None):
     #env.SetOption('num_jobs', 32)
 
     # Use link-time optimization? It's still a bit buggy, so be careful
-    #env['CXX'] = 'g++ -flto -flto-report -fuse-linker-plugin'
-    #env['CC'] = 'gcc -flto'
+    env['CXX'] = 'g++ -flto -flto-report -fuse-linker-plugin'
+    env['CC'] = 'gcc -flto'
     #env["LINKFLAGS"] = " -O3 -finline "
-    env['CXX'] = os.environ["CXX"]
-    env['CC'] = os.environ["CC"]
+    #env['CXX'] = os.environ["CXX"]
+    #env['CC'] = os.environ["CC"]
     if useIcc:
         env['CC'] = 'icc'
         env['CXX'] = 'icpc -ipo'
@@ -165,10 +165,10 @@ def buildSim(cppFlags, dir, type, pgo=None):
     env["CPPFLAGS"] += ' -DZSIM_PATH="' + joinpath(ROOT, joinpath(buildDir, "libzsim.so")) + '" '
 
     # Boost regex
-    BOOST = os.environ["BOOST"]
-    env["CPPPATH"] += [BOOST]
-    env["LIBPATH"] += [joinpath(os.environ['BOOST'], "stage/lib")]
-    env["LIBS"] += ["boost_regex"]
+    # BOOST = os.environ["BOOST"]
+    # env["CPPPATH"] += [BOOST]
+    # env["LIBPATH"] += [joinpath(os.environ['BOOST'], "stage/lib")]
+    # env["LIBS"] += ["boost_regex"]
 
     # Do PGO?
     if pgo == "generate":

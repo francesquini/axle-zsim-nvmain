@@ -1,5 +1,5 @@
 /** $glic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  * Copyright (C) 2011 Google Inc.
  *
@@ -24,16 +24,16 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "scheduler.h"
 #include <fstream>
+#include <regex>
 #include <sys/stat.h>
 #include "config.h" // for ParseList
 #include "pin.H"
 #include "process_tree.h"
 #include "profile_stats.h"
-#include "scheduler.h"
 #include "str.h"
 #include "virt/syscall_name.h"
-#include <boost/regex.hpp>
 
 //The scheduler class started simple, but at some point having it all in the header is too ridiculous. Migrate non perf-intensive calls here! (all but sync, really)
 
@@ -65,7 +65,7 @@ static void TrueSleep(uint32_t usecs) {
 }
 
 /* Hacky way to figure out if a thread is sleeping on a certain futex.
- * 
+ *
  * Uses /proc/<pid>/task/<tid>/syscall, which is only set when the process is
  * actually sleeping on the syscall, not just in the kernel (see Linux kernel
  * docs). This interface has been available since ~2008.
@@ -81,11 +81,11 @@ bool IsSleepingInFutex(uint32_t linuxPid, uint32_t linuxTid, uintptr_t futexAddr
     std::stringstream ss;
     ss << fs.rdbuf();
     fs.close();
-    
+
     std::vector<std::string> argList = ParseList<std::string>(ss.str());
     bool match = argList.size() >= 2 &&
-        strtoul(argList[0].c_str(), NULL, 0) == SYS_futex &&
-        (uintptr_t)strtoul(argList[1].c_str(), NULL, 0) == futexAddr;
+        strtoul(argList[0].c_str(), nullptr, 0) == SYS_futex &&
+        (uintptr_t)strtoul(argList[1].c_str(), nullptr, 0) == futexAddr;
     //info("%s | %s | SYS_futex = %d futexAddr = 0x%lx | match = %d ", ss.str().c_str(), Str(argList).c_str(), SYS_futex, futexAddr, match);
     return match;
 }
@@ -140,8 +140,8 @@ void Scheduler::watchdogThreadFunc() {
                 uint32_t cid = th->cid;
 
                 const g_string& sbRegexStr = zinfo->procArray[pid]->getSyscallBlacklistRegex();
-                boost::regex sbRegex(sbRegexStr.c_str());
-                if (boost::regex_match(GetSyscallName(fl->syscallNumber), sbRegex)) {
+                std::regex sbRegex(sbRegexStr.c_str());
+                if (std::regex_match(GetSyscallName(fl->syscallNumber), sbRegex)) {
                     // If this is the last leave we catch, it is the culprit for sure -> blacklist it
                     // Over time, this will blacklist every blocking syscall
                     // The root reason for being conservative though is that we don't have a sure-fire
@@ -151,11 +151,23 @@ void Scheduler::watchdogThreadFunc() {
                         blockingSyscalls[pid].insert(fl->pc);
                     }
 
-                    finishFakeLeave(th);
+                    uint64_t pc = fl->pc;
+                    do {
+                        finishFakeLeave(th);
 
-                    futex_unlock(&schedLock);
-                    leave(pid, tid, cid);
-                    futex_lock(&schedLock);
+                        futex_unlock(&schedLock);
+                        leave(pid, tid, cid);
+                        futex_lock(&schedLock);
+
+                        // also do real leave for other threads blocked at the same pc ...
+                        fl = fakeLeaves.front();
+                        if (fl == nullptr || getPid(th->gid) != pid || fl->pc != pc)
+                            break;
+                        th = fl->th;
+                        tid = getTid(th->gid);
+                        cid = th->cid;
+                        // ... until a lower bound on queue size, in order to make blacklist work
+                    } while (fakeLeaves.size() > 8);
                 } else {
                     info("Skipping, [%d] %s @ 0x%lx | arg0 0x%lx arg1 0x%lx does not match blacklist regex (%s)",
                             pid, GetSyscallName(fl->syscallNumber), fl->pc, fl->arg0, fl->arg1, sbRegexStr.c_str());
@@ -254,7 +266,7 @@ void Scheduler::threadTrampoline(void* arg) {
 }
 
 void Scheduler::startWatchdogThread() {
-    PIN_SpawnInternalThread(threadTrampoline, this, 64*1024, NULL);
+    PIN_SpawnInternalThread(threadTrampoline, this, 64*1024, nullptr);
 }
 
 
@@ -291,7 +303,7 @@ void Scheduler::notifyFutexWakeStart(uint32_t pid, uint32_t tid, uint32_t maxWak
     ThreadInfo* th = gidMap[getGid(pid, tid)];
     DEBUG_FUTEX("[%d/%d] wakeStart max %d", pid, tid, maxWakes);
     assert(th->futexJoin.action == FJA_NONE);
-    
+
     // Programs sometimes call FUTEX_WAIT with maxWakes = UINT_MAX to wake
     // everyone waiting on it; we cap to a reasonably high number to avoid
     // overflows on maxAllowedFutexWakeups
@@ -303,7 +315,7 @@ void Scheduler::notifyFutexWakeStart(uint32_t pid, uint32_t tid, uint32_t maxWak
 }
 
 void Scheduler::notifyFutexWakeEnd(uint32_t pid, uint32_t tid, uint32_t wokenUp) {
-    futex_lock(&schedLock); 
+    futex_lock(&schedLock);
     ThreadInfo* th = gidMap[getGid(pid, tid)];
     DEBUG_FUTEX("[%d/%d] wakeEnd woken %d", pid, tid, wokenUp);
     th->futexJoin.action = FJA_WAKE;
@@ -330,7 +342,7 @@ void Scheduler::futexWakeJoin(ThreadInfo* th) {  // may release schedLock
     assert(maxWakes <= maxAllowedFutexWakeups);
     assert(wokenUp <= maxWakes);
     maxAllowedFutexWakeups -= (maxWakes - wokenUp);
-    
+
     assert(unmatchedFutexWakeups <= maxAllowedFutexWakeups); // should panic...
 
     DEBUG_FUTEX("Futex wake matching %d %d", unmatchedFutexWakeups, maxAllowedFutexWakeups);
@@ -381,13 +393,13 @@ void Scheduler::finishFakeLeave(ThreadInfo* th) {
     FakeLeaveInfo* si = th->fakeLeave;
     fakeLeaves.remove(si);
     delete si;
-    assert(th->fakeLeave == NULL);
+    assert(th->fakeLeave == nullptr);
 }
 
 void Scheduler::waitUntilQueued(ThreadInfo* th) {
     uint64_t startNs = getNs();
     uint32_t sleepUs = 1;
-    while(!IsSleepingInFutex(th->linuxTid, th->linuxTid, (uintptr_t)&schedLock)) {
+    while(!IsSleepingInFutex(th->linuxPid, th->linuxTid, (uintptr_t)&schedLock)) {
         TrueSleep(sleepUs++); // linear backoff, start small but avoid overwhelming the OS with short sleeps
         uint64_t curNs = getNs();
         if (curNs - startNs > (2L<<31L) /* ~2s */) {
