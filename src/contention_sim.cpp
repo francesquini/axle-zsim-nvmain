@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -94,7 +94,7 @@ ContentionSim::ContentionSim(uint32_t _numDomains, uint32_t _numSimThreads) {
     threadTicket = 0;
     __sync_synchronize();
     for (uint32_t i = 0; i < numSimThreads; i++) {
-        PIN_SpawnInternalThread(SimThreadTrampoline, this, 1024*1024, NULL);
+        PIN_SpawnInternalThread(SimThreadTrampoline, this, 1024*1024, nullptr);
     }
 
     lastCrossing = gm_calloc<CrossingEventInfo>(numDomains*numDomains*MAX_THREADS); //TODO: refine... this allocs too much
@@ -187,7 +187,7 @@ void ContentionSim::enqueue(TimingEvent* ev, uint64_t cycle) {
     assert(ev);
     assert_msg(cycle >= lastLimit, "Enqueued event before last limit! cycle %ld min %ld", cycle, lastLimit);
     //Hacky, but helpful to chase events scheduled too far ahead due to bugs (e.g., cycle -1). We should probably formalize this a bit more
-    assert_msg(cycle < lastLimit+10*zinfo->phaseLength+10000, "Queued event too far into the future, cycle %ld lastLimit %ld", cycle, lastLimit);
+    assert_msg(cycle < lastLimit+10*zinfo->phaseLength+1000000, "Queued event too far into the future, cycle %ld lastLimit %ld", cycle, lastLimit);
 
     assert_msg(cycle >= domains[ev->domain].curCycle, "Queued event goes back in time, cycle %ld curCycle %ld", cycle, domains[ev->domain].curCycle);
     ev->privCycle = cycle;
@@ -220,7 +220,7 @@ void ContentionSim::enqueueCrossing(CrossingEvent* ev, uint64_t cycle, uint32_t 
     CrossingStack& cs = evRec->getCrossingStack();
     bool isFirst = cs.empty();
     bool isResp = false;
-    CrossingEvent* req = NULL;
+    CrossingEvent* req = nullptr;
     if (!isFirst) {
         CrossingEvent* b = cs.back();
         if (b->srcDomain == (uint32_t)ev->domain && (uint32_t)b->domain == ev->srcDomain) {

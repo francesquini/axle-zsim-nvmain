@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -22,6 +22,9 @@
  * You should have received a copy of the GNU General Public License along with
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+#ifndef BREAKDOWN_STATS_H_
+#define BREAKDOWN_STATS_H_
 
 #include "bithacks.h"
 #include "stats.h"
@@ -67,3 +70,4 @@ class CycleBreakdownStat : public VectorCounter {
         }
 };
 
+#endif  // BREAKDOWN_STATS_H_

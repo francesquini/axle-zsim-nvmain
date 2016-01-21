@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -169,5 +169,5 @@ uint64_t SHA1HashFamily::hash(uint32_t id, uint64_t val) {
     panic("???");
     return 0;
 }
- 
+
 #endif  // _WITH_POLARSSL_

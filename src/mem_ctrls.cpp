@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -49,7 +49,7 @@ uint64_t SimpleMemory::access(MemReq& req) {
 /*
     if ((req.type == GETS || req.type == GETX) && eventRecorders[req.srcId]) {
         Address addr = req.lineAddr<<lineBits;
-        MemAccReqEvent* memEv = new (eventRecorders[req.srcId]->alloc<MemAccReqEvent>()) MemAccReqEvent(NULL, false, addr);
+        MemAccReqEvent* memEv = new (eventRecorders[req.srcId]->alloc<MemAccReqEvent>()) MemAccReqEvent(nullptr, false, addr);
         TimingRecord tr = {addr, req.cycle, respCycle, req.type, memEv, memEv};
         eventRecorders[req.srcId]->pushRecord(tr);
     }

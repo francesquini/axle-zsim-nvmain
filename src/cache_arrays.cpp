@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -33,7 +33,7 @@ SetAssocArray::SetAssocArray(uint32_t _numLines, uint32_t _assoc, ReplPolicy* _r
     array = gm_calloc<Address>(numLines);
     numSets = numLines/assoc;
     setMask = numSets - 1;
-    assert(isPow2(numSets));
+    assert_msg(isPow2(numSets), "must have a power of 2 # sets, but you specified %d", numSets);
 }
 
 int32_t SetAssocArray::lookup(const Address lineAddr, const MemReq* req, bool updateReplacement) {
@@ -142,11 +142,20 @@ uint32_t ZArray::preinsert(const Address lineAddr, const MemReq* req, Address* w
             uint32_t hval = hf->hash(w, fringeAddr) & setMask;
             uint32_t pos = w*numSets + hval;
             uint32_t lineId = lookupArray[pos];
+
+            // Logically, you want to do this...
+#if 0
             if (lineId != fringeId) {
                 //info("Candidate %d way %d addr 0x%lx pos %d lineId %d parent %d", numCandidates, w, array[lineId], pos, lineId, fringeStart);
                 candidates[numCandidates++].set(pos, lineId, (int32_t)fringeStart);
                 all_valid &= (array[lineId] != 0);
             }
+#endif
+            // But this compiles as a branch and ILP sucks (this data-dependent branch is long-latency and mispredicted often)
+            // Logically though, this is just checking for whether we're revisiting ourselves, so we can eliminate the branch as follows:
+            candidates[numCandidates].set(pos, lineId, (int32_t)fringeStart);
+            all_valid &= (array[lineId] != 0);  // no problem, if lineId == fringeId the line's already valid, so no harm done
+            numCandidates += (lineId != fringeId); // if lineId == fringeId, the cand we just wrote will be overwritten
         }
         fringeStart++;
     }

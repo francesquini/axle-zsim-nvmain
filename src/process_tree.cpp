@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -154,10 +154,10 @@ static void PopulateLevel(Config& config, const std::string& prefix, std::vector
         //Get patch root fs
         std::string patchRoot = config.get<const char*>(p_ss.str() +  ".patchRoot", "");
 
-        const char* gpr = NULL;
+        const char* gpr = nullptr;
         if (patchRoot != "") {
             //In case this is a relpath, convert it to absolute
-            char* pathBuf = realpath(patchRoot.c_str(), NULL); //mallocs the buffer
+            char* pathBuf = realpath(patchRoot.c_str(), nullptr); //mallocs the buffer
             assert(pathBuf);
             gpr = gm_strdup(pathBuf);
             free(pathBuf);
@@ -224,7 +224,7 @@ static void PopulateLevel(Config& config, const std::string& prefix, std::vector
 }
 
 void CreateProcessTree(Config& config) {
-    ProcessTreeNode* rootNode = new ProcessTreeNode(-1, -1, false, false, false, 0, 0, 0, false, 0, g_vector<bool> {},  g_vector<uint64_t> {}, g_string {}, NULL);
+    ProcessTreeNode* rootNode = new ProcessTreeNode(-1, -1, false, false, false, 0, 0, 0, false, 0, g_vector<bool> {},  g_vector<uint64_t> {}, g_string {}, nullptr);
     uint32_t procIdx = 0;
     uint32_t groupIdx = 0;
     std::vector<ProcessTreeNode*> globProcVector;

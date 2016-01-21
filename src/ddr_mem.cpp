@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -104,7 +104,7 @@ class SchedEvent : public TimingEvent, public GlobAlloc {
             setRunning();
             hold();
             state = IDLE;
-            next = NULL;
+            next = nullptr;
         }
 
         void parentDone(uint64_t startCycle) {
@@ -221,8 +221,8 @@ DDRMemory::DDRMemory(uint32_t _lineSize, uint32_t _colSize, uint32_t _ranksPerCh
     new RefreshEvent(this, memToSysCycle(tREFI), domain);
 
     nextSchedCycle = -1ul;
-    nextSchedEvent = NULL;
-    eventFreelist = NULL;
+    nextSchedEvent = nullptr;
+    eventFreelist = nullptr;
 }
 
 void DDRMemory::initStats(AggregateStat* parentStat) {
@@ -296,7 +296,7 @@ DDRMemory::AddrLoc DDRMemory::mapLineAddr(Address lineAddr) {
 void DDRMemory::enqueue(DDRMemoryAccEvent* ev, uint64_t sysCycle) {
     uint64_t memCycle = sysToMemCycle(sysCycle);
     DEBUG("%ld: enqueue() addr 0x%lx wr %d", memCycle, ev->getAddr(), ev->isWrite());
-    
+
     // Create request
     Request ovfReq;
     bool overflow = rdQueue.full() || wrQueue.full();
@@ -320,14 +320,14 @@ void DDRMemory::enqueue(DDRMemoryAccEvent* ev, uint64_t sysCycle) {
 
         // If needed, schedule an event to handle this new request
         if (!req->prev /* first in bank */) {
-            uint64_t minSchedCycle = std::max(memCycle, minRespCycle - tCL - tBL);  
+            uint64_t minSchedCycle = std::max(memCycle, minRespCycle - tCL - tBL);
             if (nextSchedCycle > minSchedCycle) minSchedCycle = std::max(minSchedCycle, findMinCmdCycle(*req));
             if (nextSchedCycle > minSchedCycle) {
                 if (nextSchedEvent) nextSchedEvent->annul();
                 if (eventFreelist) {
                     nextSchedEvent = eventFreelist;
                     eventFreelist = eventFreelist->next;
-                    nextSchedEvent->next = NULL;
+                    nextSchedEvent->next = nullptr;
                 } else {
                     nextSchedEvent = new SchedEvent(this, domain);
                 }
@@ -338,21 +338,21 @@ void DDRMemory::enqueue(DDRMemoryAccEvent* ev, uint64_t sysCycle) {
                 nextSchedEvent->enqueue(enqSysCycle);
                 nextSchedCycle = minSchedCycle;
             }
-        } 
+        }
     }
 }
 
-void DDRMemory::queue(Request* req, uint64_t memCycle) {    
+void DDRMemory::queue(Request* req, uint64_t memCycle) {
     // If it's a write, respond to it immediately
     if (req->write) {
         auto ev = req->ev;
-        req->ev = NULL;
+        req->ev = nullptr;
 
         ev->release();
         uint64_t respCycle = memToSysCycle(memCycle) + minWrLatency;
         ev->done(respCycle - preDelay - postDelayWr);
     }
-    
+
     req->arrivalCycle = memCycle;  // if this comes from the overflow queue, update
 
     // Test: Skip writes
@@ -437,7 +437,7 @@ uint64_t DDRMemory::tick(uint64_t sysCycle) {
         overflowQueue.pop_front();
 
         queue(req, memCycle);
-        
+
         // This request may be schedulable before trySchedule's minSchedCycle
         if (!req->prev /*first in bank queue*/) {
             uint64_t minQueuedSchedCycle = std::max(memCycle, minRespCycle - tCL - tBL);
@@ -451,7 +451,7 @@ uint64_t DDRMemory::tick(uint64_t sysCycle) {
 
     nextSchedCycle = minSchedCycle;
     if (nextSchedCycle == -1ul) {
-        nextSchedEvent = NULL;
+        nextSchedEvent = nullptr;
         return 0;
     } else {
         // sysToMemCycle translates this back to nextSchedCycle
@@ -462,7 +462,7 @@ uint64_t DDRMemory::tick(uint64_t sysCycle) {
 
 void DDRMemory::recycleEvent(SchedEvent* ev) {
     assert(ev != nextSchedEvent);
-    assert(ev->next == NULL);
+    assert(ev->next == nullptr);
     ev->next = eventFreelist;
     eventFreelist = ev;
 }
@@ -513,7 +513,7 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
     RequestQueue<Request>& queue = isWriteQueue? wrQueue : rdQueue;
     assert(!queue.empty());
 
-    Request* r = NULL;
+    Request* r = nullptr;
     RequestQueue<Request>::iterator ir = queue.begin();
     uint64_t minSchedCycle = -1ul;
     while (ir != queue.end()) {
@@ -567,7 +567,7 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
 
         uint64_t actCycle = std::max(r->arrivalCycle, std::max(preCycle + tRP, bank.lastActCycle + tRRD));
         actCycle = std::max(actCycle, rankActWindows[r->loc.rank].minActCycle() + tFAW);
-        
+
         // Record ACT
         bank.open = true;
         bank.openRow = r->loc.row;
@@ -602,10 +602,10 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
     if (r->ev) {
         auto ev = r->ev;
         assert(!ev->isWrite() && !r->write);  // reads only
-        
+
         uint64_t doneSysCycle = memToSysCycle(minRespCycle) + controllerSysLatency;
         assert(doneSysCycle >= sysCycle);
-        
+
         ev->release();
         ev->done(doneSysCycle - preDelay - postDelayRd);
 
@@ -623,7 +623,7 @@ uint64_t DDRMemory::trySchedule(uint64_t curCycle, uint64_t sysCycle) {
     }
 
     DEBUG("Served 0x%lx lat %ld clocks", r->addr, minRespCycle-curCycle);
-    
+
     // Dequeue this req
     queue.remove(ir);
     (isWriteQueue? bank.wrReqs : bank.rdReqs).pop_front();
@@ -651,7 +651,7 @@ void DDRMemory::refresh(uint64_t sysCycle) {
             bank.open = false;
         }
     }
-    
+
     DEBUG("Refresh %ld start %ld done %ld", memCycle, minRefreshCycle, refreshDoneCycle);
 }
 
@@ -679,7 +679,7 @@ void DDRMemory::initTech(const char* techName) {
         tWTR = 5;
         tWR = 10;
         tRFC = 74;
-        tREFI = 7800;
+        tREFI = 5200;
     } else if (tech == "DDR3-1066-CL7") {
         // from DDR3_micron_16M_8B_x4_sg187.ini
         // see http://download.micron.com/pdf/datasheets/dram/ddr3/1Gb_DDR3_SDRAM.pdf, cl7 variant, copied from it; tRRD is widely different, others match
@@ -695,7 +695,7 @@ void DDRMemory::initTech(const char* techName) {
         tWTR = 4;
         tWR = 7;
         tRFC = 59;
-        tREFI = 7800;
+        tREFI = 4160;
     } else if (tech == "DDR3-1066-CL8") {
         // from DDR3_micron_16M_8B_x4_sg187.ini
         tCK = 1.875;
@@ -710,7 +710,7 @@ void DDRMemory::initTech(const char* techName) {
         tWTR = 4;
         tWR = 8;
         tRFC = 59;
-        tREFI = 7800;
+        tREFI = 4160;
     } else {
         panic("Unknown technology %s, you'll need to define it", techName);
     }
@@ -728,7 +728,7 @@ void DDRMemory::initTech(const char* techName) {
         // even 32 bytes is pushing it, 32B probably calls for coalescing buffers
         panic("Unsupported line size %d", lineSize);
     }
-    
+
     memFreqKHz = (uint64_t)(1e9/tCK/1e3);
 }
 

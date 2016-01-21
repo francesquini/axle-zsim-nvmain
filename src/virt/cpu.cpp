@@ -1,5 +1,5 @@
 /** $glic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  * Copyright (C) 2011 Google Inc.
  *
@@ -35,7 +35,7 @@ void VirtGetcpu(uint32_t tid, uint32_t cpu, ADDRINT arg0, ADDRINT arg1) {
     unsigned resCpu;
     unsigned resNode = 0;
     if (!arg0) {
-        info("getcpu() called with NULL cpu arg");
+        info("getcpu() called with null cpu arg");
     }
     if (!safeCopy((unsigned*)arg0, &resCpu)) {
         info("getcpu() called with invalid cpu arg");

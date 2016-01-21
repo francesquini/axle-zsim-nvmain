@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -57,7 +57,7 @@ class StlGlobAlloc {
         pointer address(reference x) const { return &x; }
         const_pointer address(const_reference x) const { return &x; }
         StlGlobAlloc<T>& operator=(const StlGlobAlloc&) { return *this; }
-        
+
 
         // Construct/destroy
         // gcc keeps changing these interfaces. See /usr/include/c++/4.8/ext/new_allocator.h

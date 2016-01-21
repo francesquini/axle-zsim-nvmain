@@ -284,7 +284,7 @@ FwdEntry	ooo_core.h	/^        struct FwdEntry {$/;"	s	class:OOOCore
 GALLOC_H_	galloc.h	27;"	d
 GETS	memory_hierarchy.h	/^    GETS, \/\/ get line, exclusive permission not needed (triggered by a processor load)$/;"	e	enum:__anon8
 GETX	memory_hierarchy.h	/^    GETX, \/\/ get line, exclusive permission needed (triggered by a processor store o atomic access)$/;"	e	enum:__anon8
-GM	galloc.cpp	/^static gm_segment* GM = NULL;$/;"	v	file:
+GM	galloc.cpp	/^static gm_segment* GM = nullptr;$/;"	v	file:
 GM_BASE_ADDR	galloc.cpp	51;"	d	file:
 GRACEFUL_TERMINATION	zsim_harness.cpp	/^    GRACEFUL_TERMINATION,$/;"	e	enum:__anon3	file:
 G_LIST_H_	g_std/g_list.h	27;"	d
@@ -400,13 +400,13 @@ ISSUES_PER_CYCLE	ooo_core.cpp	55;"	d	file:
 ISSUE_STAGE	ooo_core.cpp	50;"	d	file:
 IdHashFamily	hash.h	/^class IdHashFamily : public HashFamily {$/;"	c
 IdPartInfo	ideal_arrays.h	/^        struct IdPartInfo : public PartInfo {$/;"	s	class:IdealLRUPartReplPolicy
-IdealLRUArray	ideal_arrays.h	/^        explicit IdealLRUArray(uint32_t _numLines) : numLines(_numLines), cc(NULL) {$/;"	f	class:IdealLRUArray
+IdealLRUArray	ideal_arrays.h	/^        explicit IdealLRUArray(uint32_t _numLines) : numLines(_numLines), cc(nullptr) {$/;"	f	class:IdealLRUArray
 IdealLRUArray	ideal_arrays.h	/^class IdealLRUArray : public CacheArray {$/;"	c
 IdealLRUPartArray	ideal_arrays.h	/^        IdealLRUPartArray(uint32_t _numLines, IdealLRUPartReplPolicy* _rp) : rp(_rp), numLines(_numLines) {$/;"	f	class:IdealLRUPartArray
 IdealLRUPartArray	ideal_arrays.h	/^class IdealLRUPartArray : public CacheArray {$/;"	c
 IdealLRUPartReplPolicy	ideal_arrays.h	/^        IdealLRUPartReplPolicy(PartitionMonitor* _monitor, PartMapper* _mapper, uint32_t _numLines, uint32_t _numBuckets) : PartReplPolicy(_monitor, _mapper), numLines(_numLines), numBuckets(_numBuckets) {$/;"	f	class:IdealLRUPartReplPolicy
 IdealLRUPartReplPolicy	ideal_arrays.h	/^class IdealLRUPartReplPolicy : public PartReplPolicy {$/;"	c
-InList	intrusive_list.h	/^        InList() : head(NULL), tail(NULL), elems(0) {}$/;"	f	class:InList
+InList	intrusive_list.h	/^        InList() : head(nullptr), tail(nullptr), elems(0) {}$/;"	f	class:InList
 InList	intrusive_list.h	/^class InList {$/;"	c
 InListNode	intrusive_list.h	/^    InListNode() {$/;"	f	struct:InListNode
 InListNode	intrusive_list.h	/^struct InListNode {$/;"	s
@@ -538,11 +538,11 @@ MEMORY_HIERARCHY_H_	memory_hierarchy.h	27;"	d
 MEM_CTRLS_H_	mem_ctrls.h	27;"	d
 MESIBottomCC	coherence_ctrls.h	/^        MESIBottomCC(uint32_t _numLines, uint32_t _selfId, bool _nonInclusiveHack) : numLines(_numLines), selfId(_selfId), nonInclusiveHack(_nonInclusiveHack) {$/;"	f	class:MESIBottomCC
 MESIBottomCC	coherence_ctrls.h	/^class MESIBottomCC : public GlobAlloc {$/;"	c
-MESICC	coherence_ctrls.h	/^        MESICC(uint32_t _numLines, bool _nonInclusiveHack, g_string& _name) : tcc(NULL), bcc(NULL),$/;"	f	class:MESICC
+MESICC	coherence_ctrls.h	/^        MESICC(uint32_t _numLines, bool _nonInclusiveHack, g_string& _name) : tcc(nullptr), bcc(nullptr),$/;"	f	class:MESICC
 MESICC	coherence_ctrls.h	/^class MESICC : public CC {$/;"	c
 MESIState	memory_hierarchy.h	/^} MESIState;$/;"	t	typeref:enum:__anon10
 MESIStateName	memory_hierarchy.cpp	/^const char* MESIStateName(MESIState s) {$/;"	f
-MESITerminalCC	coherence_ctrls.h	/^        MESITerminalCC(uint32_t _numLines, const g_string& _name) : bcc(NULL), numLines(_numLines), name(_name) {}$/;"	f	class:MESITerminalCC
+MESITerminalCC	coherence_ctrls.h	/^        MESITerminalCC(uint32_t _numLines, const g_string& _name) : bcc(nullptr), numLines(_numLines), name(_name) {}$/;"	f	class:MESITerminalCC
 MESITerminalCC	coherence_ctrls.h	/^class MESITerminalCC : public CC {$/;"	c
 MESITopCC	coherence_ctrls.h	/^        MESITopCC(uint32_t _numLines, bool _nonInclusiveHack) : numLines(_numLines), nonInclusiveHack(_nonInclusiveHack) {$/;"	f	class:MESITopCC
 MESITopCC	coherence_ctrls.h	/^class MESITopCC : public GlobAlloc {$/;"	c
@@ -785,11 +785,11 @@ ProcessTreeNode	process_tree.h	/^class ProcessTreeNode : public GlobAlloc {$/;"	
 ProfViolReplPolicy	repl_policies.h	/^        explicit ProfViolReplPolicy(uint32_t nl) : T(nl) {}$/;"	f	class:ProfViolReplPolicy
 ProfViolReplPolicy	repl_policies.h	/^class ProfViolReplPolicy : public T {$/;"	c
 ProfileStates	zsim.h	/^enum ProfileStates {$/;"	g
-ProxyFuncStat	stats.h	/^        ProxyFuncStat() : Stat(), _func(NULL) {}$/;"	f	class:ProxyFuncStat
+ProxyFuncStat	stats.h	/^        ProxyFuncStat() : Stat(), _func(nullptr) {}$/;"	f	class:ProxyFuncStat
 ProxyFuncStat	stats.h	/^class ProxyFuncStat : public Stat {$/;"	c
 ProxyReplPolicy	ideal_arrays.h	/^                explicit ProxyReplPolicy(IdealLRUArray* _a) : a(_a) {}$/;"	f	class:IdealLRUArray::ProxyReplPolicy
 ProxyReplPolicy	ideal_arrays.h	/^        class ProxyReplPolicy : public ReplPolicy {$/;"	c	class:IdealLRUArray
-ProxyStat	stats.h	/^        ProxyStat() : Stat(), _statPtr(NULL) {}$/;"	f	class:ProxyStat
+ProxyStat	stats.h	/^        ProxyStat() : Stat(), _statPtr(nullptr) {}$/;"	f	class:ProxyStat
 ProxyStat	stats.h	/^class ProxyStat : public Stat {$/;"	c
 QUEUED	ddr_mem.cpp	/^        enum State { IDLE, QUEUED, RUNNING, ANNULLED };$/;"	e	enum:SchedEvent::State	file:
 QUEUED	scheduler.h	/^            QUEUED \/\/in the runqueue$/;"	e	enum:Scheduler::ThreadState
@@ -836,7 +836,7 @@ ReorderBuffer	ooo_core.h	/^        ReorderBuffer() {$/;"	f	class:ReorderBuffer
 ReorderBuffer	ooo_core.h	/^class ReorderBuffer {$/;"	c
 ReplAccessEvent	timing_cache.cpp	/^        ReplAccessEvent(TimingCache* _cache, uint32_t _accsLeft, uint32_t preDelay, uint32_t postDelay, int32_t domain) : TimingEvent(preDelay, postDelay, domain), cache(_cache), accsLeft(_accsLeft) {}$/;"	f	class:ReplAccessEvent
 ReplAccessEvent	timing_cache.cpp	/^class ReplAccessEvent : public TimingEvent {$/;"	c	file:
-ReplPolicy	repl_policies.h	/^        ReplPolicy() : cc(NULL) {}$/;"	f	class:ReplPolicy
+ReplPolicy	repl_policies.h	/^        ReplPolicy() : cc(nullptr) {}$/;"	f	class:ReplPolicy
 ReplPolicy	repl_policies.h	/^class ReplPolicy : public GlobAlloc {$/;"	c
 Request	ddr_mem.h	/^        struct Request : InListNode<Request> {$/;"	s	class:DDRMemory
 RequestQueue	ddr_mem.h	/^class RequestQueue {$/;"	c
@@ -908,11 +908,11 @@ SimpleMemory	mem_ctrls.h	/^class SimpleMemory : public MemObject {$/;"	c
 SkipTimeVirt	virt/time.cpp	/^static bool SkipTimeVirt(PrePatchArgs args) {$/;"	f	file:
 SkipTimeoutVirt	virt/timeout.cpp	/^static bool SkipTimeoutVirt(PrePatchArgs args) {$/;"	f	file:
 Slab	phase_slab_alloc.h	/^        struct Slab {$/;"	s	class:PhaseSlabAlloc
-SlabList	phase_slab_alloc.h	/^                SlabList() : start(NULL), end(NULL) {}$/;"	f	class:PhaseSlabAlloc::SlabList
+SlabList	phase_slab_alloc.h	/^                SlabList() : start(nullptr), end(nullptr) {}$/;"	f	class:PhaseSlabAlloc::SlabList
 SlabList	phase_slab_alloc.h	/^        class SlabList {$/;"	c	class:PhaseSlabAlloc
 SplitAddrMemory	dramsim_mem_ctrl.h	/^        SplitAddrMemory(const g_vector<MemObject*>& _mems, const char* _name) : mems(_mems), name(_name) {}$/;"	f	class:SplitAddrMemory
 SplitAddrMemory	dramsim_mem_ctrl.h	/^class SplitAddrMemory : public MemObject {$/;"	c
-Stat	stats.h	/^        Stat() : _name(NULL), _desc(NULL) {}$/;"	f	class:Stat
+Stat	stats.h	/^        Stat() : _name(nullptr), _desc(nullptr) {}$/;"	f	class:Stat
 Stat	stats.h	/^class Stat : public GlobAlloc {$/;"	c
 State	barrier.h	/^        enum State {OFFLINE, WAITING, RUNNING, LEFT};$/;"	g	class:Barrier
 State	core_recorder.h	/^        } State;$/;"	t	class:CoreRecorder	typeref:enum:CoreRecorder::__anon12
@@ -974,8 +974,8 @@ TimingCore	timing_core.cpp	/^TimingCore::TimingCore(FilterCache* _l1i, FilterCac
 TimingCore	timing_core.h	/^class TimingCore : public Core {$/;"	c
 TimingCoreEvent	core_recorder.cpp	/^        TimingCoreEvent(uint64_t _delay, uint64_t _origStartCycle, CoreRecorder* _cRec, int32_t domain = -1) : TimingEvent(0, _delay, domain), origStartCycle(_origStartCycle), cRec(_cRec) {}$/;"	f	class:TimingCoreEvent
 TimingCoreEvent	core_recorder.cpp	/^class TimingCoreEvent : public TimingEvent {$/;"	c	file:
-TimingEvent	timing_event.h	/^        TimingEvent(uint32_t _preDelay, uint32_t _postDelay, int32_t _domain = -1) : next(NULL), state(EV_NONE), cycle(0), minStartCycle(-1L), child(NULL),$/;"	f	class:TimingEvent
-TimingEvent	timing_event.h	/^        explicit TimingEvent(int32_t _domain = -1) : next(NULL), state(EV_NONE), minStartCycle(-1L), child(NULL),$/;"	f	class:TimingEvent
+TimingEvent	timing_event.h	/^        TimingEvent(uint32_t _preDelay, uint32_t _postDelay, int32_t _domain = -1) : next(nullptr), state(EV_NONE), cycle(0), minStartCycle(-1L), child(nullptr),$/;"	f	class:TimingEvent
+TimingEvent	timing_event.h	/^        explicit TimingEvent(int32_t _domain = -1) : next(nullptr), state(EV_NONE), minStartCycle(-1L), child(nullptr),$/;"	f	class:TimingEvent
 TimingEvent	timing_event.h	/^class TimingEvent {$/;"	c
 TimingEventBlock	timing_event.h	/^    TimingEventBlock() {$/;"	f	struct:TimingEventBlock
 TimingEventBlock	timing_event.h	/^struct TimingEventBlock {$/;"	s
@@ -1043,7 +1043,7 @@ VdsoPatchData	zsim.cpp	/^struct VdsoPatchData {$/;"	s	file:
 VdsoRetPoint	zsim.cpp	/^VOID VdsoRetPoint(THREADID tid, REG* raxPtr) {$/;"	f
 VectorCounter	stats.h	/^        VectorCounter() : VectorStat() {}$/;"	f	class:VectorCounter
 VectorCounter	stats.h	/^class VectorCounter : public VectorStat {$/;"	c
-VectorStat	stats.h	/^        VectorStat() : _counterNames(NULL) {}$/;"	f	class:VectorStat
+VectorStat	stats.h	/^        VectorStat() : _counterNames(nullptr) {}$/;"	f	class:VectorStat
 VectorStat	stats.h	/^class VectorStat : public Stat {$/;"	c
 VirtCaptureClocks	virt/time.cpp	/^void VirtCaptureClocks(bool isDeffwd) {$/;"	f
 VirtClockGettime	virt/time.cpp	/^void VirtClockGettime(uint32_t tid, ADDRINT arg0, ADDRINT arg1) {$/;"	f
@@ -1490,7 +1490,7 @@ curRowHits	ddr_mem.h	/^            uint64_t curRowHits;    \/\/ row hits on the 
 curSlab	phase_slab_alloc.h	/^        Slab* curSlab;$/;"	m	class:PhaseSlabAlloc
 curState	breakdown_stats.h	/^        uint32_t curState;$/;"	m	class:CycleBreakdownStat
 curState	profile_stats.h	/^        uint32_t curState;$/;"	m	class:TimeBreakdownStat
-curThread	scheduler.h	/^            ThreadInfo* curThread; \/\/only current if used, otherwise NULL$/;"	m	struct:Scheduler::ContextInfo
+curThread	scheduler.h	/^            ThreadInfo* curThread; \/\/only current if used, otherwise nullptr$/;"	m	struct:Scheduler::ContextInfo
 curThreadIdx	barrier.h	/^        uint32_t curThreadIdx;$/;"	m	class:Barrier
 curWayHits	utility_monitor.h	/^        uint64_t* curWayHits;$/;"	m	class:UMon
 curWin	ooo_core.h	/^        WinCycle* curWin;$/;"	m	class:WindowStructure
@@ -1632,7 +1632,7 @@ enable_lock	g_heap/dlmalloc.h.c	2602;"	d	file:
 enable_mmap	g_heap/dlmalloc.h.c	2606;"	d	file:
 end	cache_arrays.h	/^    inline iterator end() const {return iterator(e);}$/;"	f	struct:SetAssocCands
 end	cache_arrays.h	/^    inline iterator end() const {return iterator(e);}$/;"	f	struct:ZCands
-end	ddr_mem.h	/^        inline iterator end() const {return iterator(NULL);}$/;"	f	class:RequestQueue
+end	ddr_mem.h	/^        inline iterator end() const {return iterator(nullptr);}$/;"	f	class:RequestQueue
 end	phase_slab_alloc.h	/^                Slab* end;$/;"	m	class:PhaseSlabAlloc::SlabList
 end	profile_stats.h	/^        void end() {$/;"	f	class:ClockStat
 end	zsim.cpp	/^    uintptr_t end;$/;"	m	struct:Section	file:
@@ -1720,7 +1720,7 @@ fm	g_heap/dlmalloc.h.c	4928;"	d	file:
 footprint	g_heap/dlmalloc.h.c	/^  size_t     footprint;$/;"	m	struct:malloc_state	file:
 forbidden	partitioner.h	/^        bool* forbidden;$/;"	m	class:Partitioner
 fordblks	g_heap/dlmalloc.h.c	/^  MALLINFO_FIELD_TYPE fordblks; \/* total free space *\/$/;"	m	struct:mallinfo	file:
-forkedChildNode	zsim.cpp	/^static ProcessTreeNode* forkedChildNode = NULL;$/;"	v	file:
+forkedChildNode	zsim.cpp	/^static ProcessTreeNode* forkedChildNode = nullptr;$/;"	v	file:
 freeList	ddr_mem.h	/^        InList<Node> freeList; \/\/ LIFO (higher locality)$/;"	m	class:RequestQueue
 freeList	phase_slab_alloc.h	/^        SlabList freeList;$/;"	m	class:PhaseSlabAlloc
 freeList	scheduler.h	/^        InList<ContextInfo> freeList;$/;"	m	class:Scheduler
@@ -1903,7 +1903,7 @@ globalActiveProcs	zsim.h	/^    volatile uint32_t globalActiveProcs; \/\/used for
 globalFFProcs	zsim.h	/^    volatile uint32_t globalFFProcs; \/\/count of processes that are in either synced or unsynced FF$/;"	m	struct:GlobSimInfo
 globalPauseFlag	zsim.h	/^    volatile bool globalPauseFlag; \/\/if set, pauses simulation on phase end$/;"	m	struct:GlobSimInfo
 globalSyncedFFProcs	zsim.h	/^    volatile uint32_t globalSyncedFFProcs; \/\/count of processes that are in synced FF$/;"	m	struct:GlobSimInfo
-globzinfo	zsim_harness.cpp	/^GlobSimInfo* globzinfo = NULL; \/\/used very sparingly, only in sig handlers. Should probably promote to a global like in zsim processes.$/;"	v
+globzinfo	zsim_harness.cpp	/^GlobSimInfo* globzinfo = nullptr; \/\/used very sparingly, only in sig handlers. Should probably promote to a global like in zsim processes.$/;"	v
 gm	g_heap/dlmalloc.h.c	2590;"	d	file:
 gm_attach	galloc.cpp	/^void gm_attach(int shmid) {$/;"	f
 gm_calloc	galloc.h	/^template <typename T> T* gm_calloc() {return static_cast<T*>(__gm_calloc(1, sizeof(T)));}$/;"	f
@@ -1933,7 +1933,7 @@ hMatrix	hash.h	/^        uint64_t* hMatrix;$/;"	m	class:H3HashFamily
 haltedCycles	simple_core.h	/^        uint64_t haltedCycles;$/;"	m	class:SimpleCore
 handleCrossing	timing_event.cpp	/^TimingEvent* TimingEvent::handleCrossing(TimingEvent* childEv, EventRecorder* evRec, bool unlinkChild) {$/;"	f	class:TimingEvent
 handoffEvents	scheduler.h	/^        Counter scheduleEvents, waitEvents, handoffEvents, sleepEvents;$/;"	m	class:Scheduler
-handoffThread	scheduler.h	/^            volatile ThreadInfo* handoffThread; \/\/if at the end of a sync() this is not NULL, we need to transfer our current context to the thread pointed here.$/;"	m	struct:Scheduler::ThreadInfo
+handoffThread	scheduler.h	/^            volatile ThreadInfo* handoffThread; \/\/if at the end of a sync() this is not nullptr, we need to transfer our current context to the thread pointed here.$/;"	m	struct:Scheduler::ThreadInfo
 harnessPid	zsim.h	/^    int harnessPid; \/\/used for debugging purposes$/;"	m	struct:GlobSimInfo
 hasCounterNames	stats.h	/^        inline bool hasCounterNames() {$/;"	f	class:VectorStat
 has_segment_link	g_heap/dlmalloc.h.c	/^static int has_segment_link(mstate m, msegmentptr ss) {$/;"	f	file:
@@ -2706,8 +2706,8 @@ procTree	zsim.h	/^    ProcessTreeNode* procTree;$/;"	m	struct:GlobSimInfo
 procTreeNode	zsim.cpp	/^static ProcessTreeNode* procTreeNode;$/;"	v	file:
 processAccess	coherence_ctrls.cpp	/^uint64_t MESIBottomCC::processAccess(Address lineAddr, uint32_t lineId, AccessType type, uint64_t cycle, uint32_t srcId, uint32_t flags) {$/;"	f	class:MESIBottomCC
 processAccess	coherence_ctrls.cpp	/^uint64_t MESITopCC::processAccess(Address lineAddr, uint32_t lineId, AccessType type, uint32_t childId, bool haveExclusive,$/;"	f	class:MESITopCC
-processAccess	coherence_ctrls.h	/^        uint64_t processAccess(const MemReq& req, int32_t lineId, uint64_t startCycle,  uint64_t* getDoneCycle = NULL) {$/;"	f	class:MESITerminalCC
-processAccess	coherence_ctrls.h	/^        uint64_t processAccess(const MemReq& req, int32_t lineId, uint64_t startCycle, uint64_t* getDoneCycle = NULL) {$/;"	f	class:MESICC
+processAccess	coherence_ctrls.h	/^        uint64_t processAccess(const MemReq& req, int32_t lineId, uint64_t startCycle,  uint64_t* getDoneCycle = nullptr) {$/;"	f	class:MESITerminalCC
+processAccess	coherence_ctrls.h	/^        uint64_t processAccess(const MemReq& req, int32_t lineId, uint64_t startCycle, uint64_t* getDoneCycle = nullptr) {$/;"	f	class:MESICC
 processCleanup	scheduler.h	/^        void processCleanup(uint32_t pid) {$/;"	f	class:Scheduler
 processCycles	process_stats.h	/^        g_vector<uint64_t> processCycles, processInstrs;$/;"	m	class:ProcessStats
 processEviction	coherence_ctrls.cpp	/^uint64_t MESIBottomCC::processEviction(Address wbLineAddr, uint32_t lineId, bool lowerLevelWriteback, uint64_t cycle, uint32_t srcId) {$/;"	f	class:MESIBottomCC

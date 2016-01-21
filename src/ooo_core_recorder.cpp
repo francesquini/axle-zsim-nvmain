@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -116,8 +116,8 @@ OOOCoreRecorder::OOOCoreRecorder(uint32_t _domain, g_string& _name)
 
     curId = 0;
 
-    lastEvProduced = NULL;
-    lastEvSimulated = NULL;
+    lastEvProduced = nullptr;
+    lastEvSimulated = nullptr;
 }
 
 
@@ -369,8 +369,8 @@ uint64_t OOOCoreRecorder::cSimEnd(uint64_t curCycle) {
         state = HALTED;
         DEBUG_MSG("[%s] lastEvSimulated reached (startCycle %ld), DRAINING -> HALTED", name.c_str(), lastEvSimulated->startCycle);
 
-        lastEvSimulated = NULL;
-        lastEvProduced = NULL;
+        lastEvSimulated = nullptr;
+        lastEvProduced = nullptr;
         assert(futureResponses.empty());
         // This works (because we flush on leave()) but would be inaccurate if we called leave() very frequently; now leave() only happens on blocking syscalls though
     }

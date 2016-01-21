@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -58,6 +58,7 @@ struct InstrFuncPtrs {  // NOLINT(whitespace)
 #define FPTR_ANALYSIS (0L)
 #define FPTR_JOIN (1L)
 #define FPTR_NOP (2L)
+#define FPTR_RETRY (3L)
 
 //Generic core class
 

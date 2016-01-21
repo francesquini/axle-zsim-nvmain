@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -23,8 +23,8 @@
  * this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef __DETAILED_MEM_PARAMS_H__
-#define __DETAILED_MEM_PARAMS_H__
+#ifndef DETAILED_MEM_PARAMS_H_
+#define DETAILED_MEM_PARAMS_H_
 
 #include "g_std/g_string.h"
 #include "config.h"
@@ -144,4 +144,4 @@ class MemParam : public GlobAlloc{
         uint32_t writeTermPin;
 };
 
-#endif /* __DETAILED_MEM_PARAMS_H__ */
+#endif  // DETAILED_MEM_PARAMS_H_

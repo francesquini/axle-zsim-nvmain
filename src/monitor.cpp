@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -29,9 +29,9 @@
 
 UMonMonitor::UMonMonitor(uint32_t _numLines, uint32_t _umonLines, uint32_t _umonBuckets, uint32_t _numPartitions, uint32_t _buckets)
         : PartitionMonitor(_buckets)
-        , missCache(NULL)
+        , missCache(nullptr)
         , missCacheValid(false)
-        , monitors(_numPartitions, NULL) {
+        , monitors(_numPartitions, nullptr) {
     assert(_numPartitions > 0);
 
     missCache = gm_calloc<uint32_t>(_buckets * _numPartitions);

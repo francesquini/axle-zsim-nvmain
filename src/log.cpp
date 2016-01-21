@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -44,7 +44,7 @@ void InitLog(const char* header, const char* file) {
 
     if (file) {
         FILE* fd = fopen(file, "a");
-        if (fd == NULL) {
+        if (fd == nullptr) {
             perror("fopen() failed");
             panic("Could not open logfile %s", file); //we can panic in InitLog (will dump to stderr)
         }

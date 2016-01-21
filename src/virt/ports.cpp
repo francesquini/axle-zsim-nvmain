@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -33,11 +33,11 @@
 
 // Helper function
 static struct sockaddr_in* GetSockAddr(ADDRINT guestAddr, size_t guestSize) {
-    if (guestSize != sizeof(struct sockaddr_in)) return NULL;
+    if (guestSize != sizeof(struct sockaddr_in)) return nullptr;
     struct sockaddr_in* res = (struct sockaddr_in*) malloc(sizeof(struct sockaddr_in));
     if (!safeCopy((struct sockaddr_in*) guestAddr, res) || res->sin_family != AF_INET) {
         free(res);
-        return NULL;
+        return nullptr;
     }
     return res;
 }
@@ -47,7 +47,7 @@ static struct sockaddr_in* GetSockAddr(ADDRINT guestAddr, size_t guestSize) {
 PostPatchFn PatchBind(PrePatchArgs args) {
     CONTEXT* ctxt = args.ctxt;
     SYSCALL_STANDARD std = args.std;
-    
+
     ADDRINT sAddrPtr = PIN_GetSyscallArgument(ctxt, std, 1);
     ADDRINT sLen = PIN_GetSyscallArgument(ctxt, std, 2);
     struct sockaddr_in* servAddr = GetSockAddr(sAddrPtr, sLen);

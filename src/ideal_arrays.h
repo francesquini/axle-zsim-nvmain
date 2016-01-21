@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -69,7 +69,7 @@ class IdealLRUArray : public CacheArray {
         CC* cc;
 
     public:
-        explicit IdealLRUArray(uint32_t _numLines) : numLines(_numLines), cc(NULL) {
+        explicit IdealLRUArray(uint32_t _numLines) : numLines(_numLines), cc(nullptr) {
             array = gm_calloc<Entry>(numLines);
             for (uint32_t i = 0; i < numLines; i++) {
                 Entry* e = new (&array[i]) Entry(i);
@@ -101,7 +101,7 @@ class IdealLRUArray : public CacheArray {
 
             //Update addr mapping for lineId
             lineMap.erase(e->lineAddr);
-            assert(lineMap.find(lineAddr) == lineMap.end());
+            assert((lineMap.find(lineAddr) == lineMap.end()));
             e->lineAddr = lineAddr;
             lineMap[lineAddr] = lineId;
 
@@ -271,7 +271,7 @@ class IdealLRUPartArray : public CacheArray {
         void postinsert(const Address lineAddr, const MemReq* req, uint32_t lineId) {
             //Update addr mapping for lineId
             lineMap.erase(lineAddrs[lineId]);
-            assert(lineMap.find(lineAddr) == lineMap.end());
+            assert((lineMap.find(lineAddr) == lineMap.end()));
             lineAddrs[lineId] = lineAddr;
             lineMap[lineAddr] = lineId;
 

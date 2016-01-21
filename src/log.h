@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -68,9 +68,9 @@ extern FILE* logFdErr;
 /* Set per-process header for log/info/warn/panic messages
  * Calling this is not needed (the default header is ""),
  * but it helps in multi-process runs
- * If file is NULL or InitLog is not called, logs to stdout/stderr
+ * If file is nullptr or InitLog is not called, logs to stdout/stderr
  */
-void InitLog(const char* header, const char* file = NULL);
+void InitLog(const char* header, const char* file = nullptr);
 
 #define panic(args...) \
 { \

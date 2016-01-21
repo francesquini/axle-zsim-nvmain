@@ -83,7 +83,7 @@ class SchedEventNVMain : public TimingEvent, public GlobAlloc {
             setRunning();
             hold();
             state = IDLE;
-            next = NULL;
+            next = nullptr;
         }
 
         void parentDone(uint64_t startCycle) {
@@ -155,7 +155,7 @@ NVMainMemory::NVMainMemory(std::string& nvmainTechIni, std::string& outputFile, 
 
         NVMObject *hook = NVM::HookFactory::CreateHook(hookList[i]);
 
-        if( hook != NULL ) {
+        if( hook != nullptr ) {
             AddHook( hook );
             hook->SetParent( this );
             hook->Init( nvmainConfig );
@@ -201,9 +201,9 @@ NVMainMemory::NVMainMemory(std::string& nvmainTechIni, std::string& outputFile, 
     out << "===" << std::endl;
 
     // Wave phase handling
-    nextSchedRequest = NULL;
-    nextSchedEvent = NULL;
-    eventFreelist = NULL;
+    nextSchedRequest = nullptr;
+    nextSchedEvent = nullptr;
+    eventFreelist = nullptr;
 }
 
 void NVMainMemory::initStats(AggregateStat* parentStat) {
@@ -289,8 +289,8 @@ uint64_t NVMainMemory::tick(uint64_t cycle) {
         return cycle + 1;
     } else { // has been serviced, check for inflight requests
         if (inflightRequests.empty()) {
-            nextSchedEvent = NULL;
-            nextSchedRequest = NULL;
+            nextSchedEvent = nullptr;
+            nextSchedRequest = nullptr;
             return 0; //this will recycle the SchedEvent
         } else {
             nextSchedRequest = inflightRequests.front().first;
@@ -305,7 +305,7 @@ uint64_t NVMainMemory::tick(uint64_t cycle) {
 
 void NVMainMemory::recycleEvent(SchedEventNVMain* ev) {
     assert(ev != nextSchedEvent);
-    assert(ev->next == NULL);
+    assert(ev->next == nullptr);
     ev->next = eventFreelist;
     eventFreelist = ev;
 }
@@ -367,7 +367,7 @@ void NVMainMemory::enqueue(NVMainAccEvent* ev, uint64_t cycle) {
     updateCycle = curCycle;
 
     // If command cannot be issued due to contention, retry next cycle.
-    if (!nvmainPtr->IsIssuable(request, NULL)) {
+    if (!nvmainPtr->IsIssuable(request, nullptr)) {
         //info("[%s] %s access to %lx requeued. Curent cycle %ld, requeue cycle %ld", getName(), ev->isWrite()? "Write" : "Read", ev->getAddr(), cycle, cycle+1);
         ev->requeue(cycle+1);
         delete request;
@@ -401,7 +401,7 @@ void NVMainMemory::enqueue(NVMainAccEvent* ev, uint64_t cycle) {
         if (eventFreelist) {
             nextSchedEvent = eventFreelist;
             eventFreelist = eventFreelist->next;
-            nextSchedEvent->next = NULL;
+            nextSchedEvent->next = nullptr;
         } else {
             nextSchedEvent = new SchedEventNVMain(this, domain);
         }
@@ -439,7 +439,7 @@ bool NVMainMemory::RequestComplete(NVM::NVMainRequest *creq) {
     ev->done(curCycle+1);
 
     if (creq == nextSchedRequest)
-        nextSchedRequest = NULL;
+        nextSchedRequest = nullptr;
 
     inflightRequests.erase(it);
 

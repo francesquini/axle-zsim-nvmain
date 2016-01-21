@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -275,7 +275,7 @@ inline void MTRand::seed() {
     }
 
     // Was not successful, so use time() and clock() instead
-    seed(hash(time(NULL), clock()));
+    seed(hash(time(nullptr), clock()));
 }
 
 inline MTRand::MTRand(const uint64_t oneSeed) { seed(oneSeed); }

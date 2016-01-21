@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -73,7 +73,7 @@ DRAMSimMemory::DRAMSimMemory(string& dramTechIni, string& dramSystemIni, string&
 
     TransactionCompleteCB *read_cb = new Callback<DRAMSimMemory, void, unsigned, uint64_t, uint64_t>(this, &DRAMSimMemory::DRAM_read_return_cb);
     TransactionCompleteCB *write_cb = new Callback<DRAMSimMemory, void, unsigned, uint64_t, uint64_t>(this, &DRAMSimMemory::DRAM_write_return_cb);
-    dramCore->RegisterCallbacks(read_cb, write_cb, NULL);
+    dramCore->RegisterCallbacks(read_cb, write_cb, nullptr);
 
     domain = _domain;
     TickEvent<DRAMSimMemory>* tickEv = new TickEvent<DRAMSimMemory>(this, domain);
@@ -138,7 +138,7 @@ void DRAMSimMemory::enqueue(DRAMSimAccEvent* ev, uint64_t cycle) {
 
 void DRAMSimMemory::DRAM_read_return_cb(uint32_t id, uint64_t addr, uint64_t memCycle) {
     std::multimap<uint64_t, DRAMSimAccEvent*>::iterator it = inflightRequests.find(addr);
-    assert(it != inflightRequests.end());
+    assert((it != inflightRequests.end()));
     DRAMSimAccEvent* ev = it->second;
 
     uint32_t lat = curCycle+1 - ev->sCycle;

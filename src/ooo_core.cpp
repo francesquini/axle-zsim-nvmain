@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -64,7 +64,7 @@ OOOCore::OOOCore(FilterCache* _l1i, FilterCache* _l1d, g_string& _name, uint32_t
     for (uint32_t i = 0; i < MAX_REGISTERS; i++) {
         regScoreboard[i] = 0;
     }
-    prevBbl = NULL;
+    prevBbl = nullptr;
 
     lastStoreCommitCycle = 0;
     lastStoreAddrCommitCycle = 0;
@@ -138,7 +138,7 @@ uint64_t OOOCore::getPhaseCycles() const {return curCycle % zinfo->phaseLength;}
 void OOOCore::contextSwitch(int32_t gid) {
     if (gid == -1) {
         // Do not execute previous BBL, as we were context-switched
-        prevBbl = NULL;
+        prevBbl = nullptr;
 
         // Invalidate virtually-addressed filter caches
         l1i->contextSwitch();

@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -50,8 +50,8 @@ Network::Network(const char* filename) {
         string s1 = src + " " + dst;
         string s2 = dst + " " + src;
 
-        assert(delayMap.find(s1) == delayMap.end());
-        assert(delayMap.find(s2) == delayMap.end());
+        assert((delayMap.find(s1) == delayMap.end()));
+        assert((delayMap.find(s2) == delayMap.end()));
 
         delayMap[s1] = delay;
         delayMap[s2] = delay;

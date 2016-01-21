@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -35,7 +35,7 @@ class PrioQueue {
         uint64_t occ; // bit i is 1 if array[i] is populated
 
         PQBlock() {
-            for (uint32_t i = 0; i < 64; i++) array[i] = NULL;
+            for (uint32_t i = 0; i < 64; i++) array[i] = nullptr;
             occ = 0;
         }
 
@@ -48,7 +48,7 @@ class PrioQueue {
             if (!next) occ ^= 1L << pos;
             assert(res);
             offset = pos;
-            res->next = NULL;
+            res->next = nullptr;
             return res;
         }
 

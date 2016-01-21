@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -181,11 +181,11 @@ class WayPartReplPolicy : public PartReplPolicy, public LegacyReplPolicy {
         void recordCandidate(uint32_t id) {
             assert(candIdx < ways);
             WayPartInfo* c = &array[id]; //candidate info
-            WayPartInfo* best = (bestId >= 0)? &array[bestId] : NULL;
+            WayPartInfo* best = (bestId >= 0)? &array[bestId] : nullptr;
             uint32_t way = candIdx++;
             //In test mode, this works as LRU
             if (testMode || wayPartIndex[way] == incomingLinePart) { //this is a way we can fill
-                if (best == NULL) {
+                if (best == nullptr) {
                     bestId = id;
                 } else {
                     //NOTE: This is actually not feasible without tagging. But what IS feasible is to stop updating the LRU position on new fills. We could kill this, and profile the differences.

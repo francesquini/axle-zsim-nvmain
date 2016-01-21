@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -66,7 +66,7 @@ namespace lookahead {
 class LookaheadPartitioner : public Partitioner {
     public:
         LookaheadPartitioner(PartReplPolicy* _repl, uint32_t _numPartitions, uint32_t _buckets,
-                             uint32_t _minAlloc = 1, double _allocPortion = 1.0, bool* _forbidden = NULL);
+                             uint32_t _minAlloc = 1, double _allocPortion = 1.0, bool* _forbidden = nullptr);
         void partition();
 
     private:

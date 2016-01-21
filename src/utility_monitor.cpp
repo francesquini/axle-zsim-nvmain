@@ -1,5 +1,5 @@
 /** $lic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  *
  * This file is part of zsim.
@@ -81,7 +81,7 @@ void UMon::access(Address lineAddr) {
     uint64_t set = (hf->hash(1, lineAddr)) & setMask;
 
     // Check hit
-    Node* prev = NULL;
+    Node* prev = nullptr;
     Node* cur = heads[set];
     bool hit = false;
     for (uint32_t b = 0; b < buckets; b++) {
@@ -101,7 +101,7 @@ void UMon::access(Address lineAddr) {
     if (!hit) {
         curMisses++;
         //profMisses.inc();
-        assert(cur->next == NULL);
+        assert(cur->next == nullptr);
         cur->addr = lineAddr;
     }
 

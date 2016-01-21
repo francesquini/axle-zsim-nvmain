@@ -1,5 +1,5 @@
 /** $glic$
- * Copyright (C) 2012-2014 by Massachusetts Institute of Technology
+ * Copyright (C) 2012-2015 by Massachusetts Institute of Technology
  * Copyright (C) 2010-2013 by The Board of Trustees of Stanford University
  * Copyright (C) 2011 Google Inc.
  *
@@ -32,9 +32,6 @@
 #include "virt/virt.h"
 
 #define MAX_SYSCALLS 350  // doesn't need to be accurate
-#ifndef SYS_getcpu
-#define SYS_getcpu 168
-#endif
 
 PrePatchFn prePatchFunctions[MAX_SYSCALLS];
 PostPatchFn postPatchFunctions[MAX_THREADS];
@@ -59,14 +56,14 @@ PostPatchFn WarnTimingRelated(PrePatchArgs args) {
 
 void VirtInit() {
     for (uint32_t i = 0; i < MAX_SYSCALLS; i++) prePatchFunctions[i] = NullPatch;
-   
+
     // Issue warnings on timing-sensitive syscalls
     for (uint32_t syscall : {SYS_select, SYS_getitimer, SYS_alarm, SYS_setitimer, SYS_semop,
             SYS_gettimeofday, SYS_times, SYS_rt_sigtimedwait, SYS_time, SYS_futex, SYS_mq_timedsend,
             SYS_mq_timedreceive, SYS_pselect6, SYS_ppoll}) {
         prePatchFunctions[syscall] = WarnTimingRelated;
     }
-    
+
     // Bind all patch functions
     #define PF(syscall, pfn) prePatchFunctions[syscall] = pfn;
     #include "virt/patchdefs.h"
