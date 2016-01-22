@@ -72,7 +72,7 @@ bool ProcessTreeNode::notifyStart() {
 
         //Set FFWD counters -- NOTE we can't call enter FFWD
         if (inFastForward) {
-            if (syncedFastForward) __sync_fetch_and_add(&zinfo->globalSyncedFFProcs, 1);
+            if (getSyncedFastForward()) __sync_fetch_and_add(&zinfo->globalSyncedFFProcs, 1);
             __sync_fetch_and_add(&zinfo->globalFFProcs, 1);
         }
 
@@ -102,7 +102,7 @@ bool ProcessTreeNode::notifyEnd() {
 void ProcessTreeNode::enterFastForward() {
     assert(!inFastForward);
     inFastForward = true;
-    if (syncedFastForward) __sync_fetch_and_add(&zinfo->globalSyncedFFProcs, 1);
+    if (getSyncedFastForward()) __sync_fetch_and_add(&zinfo->globalSyncedFFProcs, 1);
     __sync_fetch_and_add(&zinfo->globalFFProcs, 1);
     __sync_synchronize();
 }
@@ -110,7 +110,7 @@ void ProcessTreeNode::enterFastForward() {
 void ProcessTreeNode::exitFastForward() {
     assert(inFastForward);
     inFastForward = false;
-    if (syncedFastForward) __sync_fetch_and_sub(&zinfo->globalSyncedFFProcs, 1);
+    if (getSyncedFastForward()) __sync_fetch_and_sub(&zinfo->globalSyncedFFProcs, 1);
     __sync_fetch_and_sub(&zinfo->globalFFProcs, 1);
     __sync_synchronize();
 }
@@ -172,35 +172,40 @@ static void PopulateLevel(Config& config, const std::string& prefix, std::vector
 
 
         bool startFastForwarded = config.get<bool>(p_ss.str() +  ".startFastForwarded", false);
-        bool syncedFastForward = config.get<bool>(p_ss.str() +  ".syncedFastForward", true);
+        g_string syncedFastForwardStr = config.get<const char*>(p_ss.str() +  ".syncedFastForward", "Multiprocess");
         bool startPaused = config.get<bool>(p_ss.str() +  ".startPaused", false);
         uint32_t clockDomain = config.get<uint32_t>(p_ss.str() +  ".clockDomain", 0);
         uint32_t portDomain = config.get<uint32_t>(p_ss.str() +  ".portDomain", 0);
         uint64_t dumpHeartbeats = config.get<uint64_t>(p_ss.str() +  ".dumpHeartbeats", 0);
         bool dumpsResetHeartbeats = config.get<bool>(p_ss.str() +  ".dumpsResetHeartbeats", false);
         uint64_t dumpInstrs = config.get<uint64_t>(p_ss.str() +  ".dumpInstrs", 0);
-        uint64_t dumpCycles = config.get<uint64_t>(p_ss.str() +  ".dumpCycles", 0);
         uint32_t restarts = config.get<uint32_t>(p_ss.str() +  ".restarts", 0);
         g_string syscallBlacklistRegex = config.get<const char*>(p_ss.str() +  ".syscallBlacklistRegex", ".*");
-        g_vector<bool> mask(ParseMask(config.get<const char*>(p_ss.str() +  ".mask", DefaultMaskStr().c_str()), zinfo->numCores));
+        g_vector<bool> mask;
+        if (!zinfo->traceDriven) {
+            mask = ParseMask(config.get<const char*>(p_ss.str() +  ".mask", DefaultMaskStr().c_str()), zinfo->numCores);
+        }  //  else leave mask empty, no cores
         g_vector<uint64_t> ffiPoints(ParseList<uint64_t>(config.get<const char*>(p_ss.str() +  ".ffiPoints", "")));
 
         if (dumpInstrs) {
-            if (dumpHeartbeats || dumpCycles) warn("Dumping eventual stats on two different conditions; you won't be able to distinguish both!");
+            if (dumpHeartbeats) warn("Dumping eventual stats on both heartbeats AND instructions; you won't be able to distinguish both!");
             auto getInstrs = [procIdx]() { return zinfo->processStats->getProcessInstrs(procIdx); };
             auto dumpStats = [procIdx]() { DumpEventualStats(procIdx, "instructions"); };
             zinfo->eventQueue->insert(makeAdaptiveEvent(getInstrs, dumpStats, 0, dumpInstrs, MAX_IPC*zinfo->phaseLength*zinfo->numCores /*all cores can be on*/));
         } //NOTE: trivial to do the same with cycles
 
-        if (dumpCycles) {
-            if (dumpHeartbeats || dumpInstrs) warn("Dumping eventual stats on two different conditions; you won't be able to distinguish both!");
-            auto getCycles = [procIdx]() { return zinfo->processStats->getProcessCycles(procIdx); };
-            auto dumpStats = [procIdx]() { DumpEventualStats(procIdx, "cycles"); };
-            zinfo->eventQueue->insert(makeAdaptiveEvent(getCycles, dumpStats, 0, dumpCycles, zinfo->phaseLength*zinfo->numCores /*all cores can be on*/));
-        }
-
         if (clockDomain >= MAX_CLOCK_DOMAINS) panic("Invalid clock domain %d", clockDomain);
         if (portDomain >= MAX_PORT_DOMAINS) panic("Invalid port domain %d", portDomain);
+
+        SyncedFastForwardMode syncedFastForward;
+        if (syncedFastForwardStr == "Always")
+            syncedFastForward = SFF_ALWAYS;
+        else if (syncedFastForwardStr == "Multiprocess")
+            syncedFastForward = SFF_MULTIPROCESS;
+        else if (syncedFastForwardStr == "Never")
+            syncedFastForward = SFF_NEVER;
+        else
+            panic("Invalid synced fast forward mode %s", syncedFastForwardStr.c_str());
 
         ProcessTreeNode* ptn = new ProcessTreeNode(procIdx, groupIdx, startFastForwarded, startPaused, syncedFastForward, clockDomain, portDomain, dumpHeartbeats, dumpsResetHeartbeats, restarts, mask, ffiPoints, syscallBlacklistRegex, gpr);
         //info("Created ProcessTreeNode, procIdx %d", procIdx);
@@ -224,7 +229,7 @@ static void PopulateLevel(Config& config, const std::string& prefix, std::vector
 }
 
 void CreateProcessTree(Config& config) {
-    ProcessTreeNode* rootNode = new ProcessTreeNode(-1, -1, false, false, false, 0, 0, 0, false, 0, g_vector<bool> {},  g_vector<uint64_t> {}, g_string {}, nullptr);
+    ProcessTreeNode* rootNode = new ProcessTreeNode(-1, -1, false, false, SFF_NEVER, 0, 0, 0, false, 0, g_vector<bool> {},  g_vector<uint64_t> {}, g_string {}, nullptr);
     uint32_t procIdx = 0;
     uint32_t groupIdx = 0;
     std::vector<ProcessTreeNode*> globProcVector;

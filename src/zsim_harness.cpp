@@ -108,28 +108,29 @@ int eraseChild(int pid) {
 void chldSigHandler(int sig) {
     assert(sig == SIGCHLD);
     int status;
-    int cpid = waitpid(-1, &status, WNOHANG);
-    assert_msg(cpid > 0, "Wait should not fail, cpid=%d", cpid);
-    int idx = eraseChild(cpid);
-    if (idx < MAX_THREADS) {
-        info("Child %d done", cpid);
-        int exitCode = WIFEXITED(status)? WEXITSTATUS(status) : 0;
-        if (exitCode == PANIC_EXIT_CODE) {
-            panic("Child issued a panic, killing simulation");
-        }
-        //Stricter check: See if notifyEnd was called (i.e. zsim caught this termination)
-        //Only works for direct children though
-        if (globzinfo && !globzinfo->procExited[idx]) {
-            panic("Child %d (idx %d) exit was anomalous, killing simulation", cpid, idx);
-        }
+    int cpid;
+    while ((cpid = waitpid(-1, &status, WNOHANG)) > 0) {
+        int idx = eraseChild(cpid);
+        if (idx < MAX_THREADS) {
+            info("Child %d done", cpid);
+            int exitCode = WIFEXITED(status)? WEXITSTATUS(status) : 0;
+            if (exitCode == PANIC_EXIT_CODE) {
+                panic("Child issued a panic, killing simulation");
+            }
+            //Stricter check: See if notifyEnd was called (i.e. zsim caught this termination)
+            //Only works for direct children though
+            if (globzinfo && !globzinfo->procExited[idx]) {
+                panic("Child %d (idx %d) exit was anomalous, killing simulation", cpid, idx);
+            }
 
-        if (globzinfo && globzinfo->procExited[idx] == PROC_RESTARTME) {
-            info("Restarting procIdx %d", idx);
-            globzinfo->procExited[idx] = PROC_RUNNING;
-            LaunchProcess(idx);
+            if (globzinfo && globzinfo->procExited[idx] == PROC_RESTARTME) {
+                info("Restarting procIdx %d", idx);
+                globzinfo->procExited[idx] = PROC_RUNNING;
+                LaunchProcess(idx);
+            }
+        } else {
+            info("Child %d done (debugger)", cpid);
         }
-    } else {
-        info("Child %d done (debugger)", cpid);
     }
 }
 
@@ -166,7 +167,7 @@ void sigHandler(int sig) {
             if (childInfo[i].status == PS_RUNNING) {
                 info("Killing process %d", cpid);
                 kill(-cpid, SIGKILL);
-                sleep(0.1);
+                usleep(100000);
                 kill(cpid, SIGKILL);
             }
         }
@@ -405,7 +406,7 @@ int main(int argc, char *argv[]) {
 
     while (getNumChildren() > 0) {
         if (!gm_isready()) {
-            sched_yield(); //wait till proc idx 0 initializes everyhting
+            usleep(1000);  // wait till proc idx 0 initializes everyhting
             continue;
         }
 
@@ -415,7 +416,7 @@ int main(int argc, char *argv[]) {
             info("Attached to global heap");
         }
 
-        printHeartbeat(zinfo); //ensure we dump hostname etc on early crashes
+        printHeartbeat(zinfo);  // ensure we dump hostname etc on early crashes
 
         int left = sleep(sleepLength);
         int secsSlept = sleepLength - left;
